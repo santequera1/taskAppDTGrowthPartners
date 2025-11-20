@@ -1,0 +1,48 @@
+# Node / build
+node_modules/
+dist/
+.build/
+.vite/
+npm-debug.log*
+yarn-error.log
+pnpm-debug.log*
+
+# Vite / env
+.env
+.env.*.local
+.env.local
+.env.production
+.env.production.local
+.env.*.local
+
+# Firebase / credentials
+firebase-debug.log
+.firebase/
+serviceAccountKey.json
+credentials.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# TypeScript build cache
+*.tsbuildinfo
+
+# Logs and reports
+logs/
+*.log
+coverage/
+coverage-final.json
+
+# Misc
+*.pem
+*.key
+*.crt
+.pnpm-store/

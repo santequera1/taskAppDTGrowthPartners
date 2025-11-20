@@ -1,0 +1,37 @@
+/* Custom scrollbar styles for the app
+   Uses a transparent track and a subtle thumb slightly lighter than the
+   background so it reads as a "premium" thin scrollbar.
+   Applied via the `custom-scrollbar` utility class used in columns/sidebar.
+*/
+
+/* Firefox */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148,163,184,0.18) transparent; /* thumb, track */
+}
+
+/* WebKit browsers */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(148,163,184,0.18); /* slate-ish light */
+  border-radius: 9999px;
+  border: 2px solid transparent; /* creates padding effect */
+  background-clip: padding-box;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(148,163,184,0.32);
+}
+
+/* Optional: hide default scrollbar corner */
+.custom-scrollbar::-webkit-scrollbar-corner {
+  background: transparent;
+}

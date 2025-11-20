@@ -1,0 +1,72 @@
+sube el repo a GitHub, ignora también la carpeta ACTUALIZACIONES
+gitignore sugerido
+Crea (o actualiza)  .gitignore en la raíz del repo con este contenido:
+# Node / build
+node_modules/
+dist/
+.build/
+.vite/
+npm-debug.log*
+yarn-error.log
+pnpm-debug.log*
+
+# Vite / env
+.env
+.env.*.local
+.env.local
+.env.production
+.env.production.local
+.env.*.local
+
+# Firebase / credentials
+firebase-debug.log
+.firebase/
+serviceAccountKey.json
+credentials.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# TypeScript build cache
+*.tsbuildinfo
+
+# Logs and reports
+logs/
+*.log
+coverage/
+coverage-final.json
+
+# Misc
+*.pem
+*.key
+*.crt
+.pnpm-store/
+
+# Node / buildnode_modules/dist/.build/.vite/npm-debug.log*yarn-error.logpnpm-debug.log*# Vite / env.env.env.*.local.env.local.env.production.env.production.local.env.*.local# Firebase / credentialsfirebase-debug.log.firebase/serviceAccountKey.jsoncredentials.json# OS / editor.DS_StoreThumbs.dbdesktop.ini.vscode/.idea/*.suo*.ntvs**.njsproj*.sln# TypeScript build cache*.tsbuildinfo# Logs and reportslogs/*.logcoverage/coverage-final.json# Misc*.pem*.key*.crt.pnpm-store/
+
+
+Quick setup — if you’ve done this kind of thing before
+or	
+https://github.com/santequera1/taskAppDTGrowthPartners.git
+Get started by creating a new file or uploading an existing file. We recommend every repository include a README, LICENSE, and .gitignore.
+
+…or create a new repository on the command line
+echo "# taskAppDTGrowthPartners" >> README.md
+git init
+git add README.md
+git commit -m "first commit"
+git branch -M main
+git remote add origin https://github.com/santequera1/taskAppDTGrowthPartners.git
+git push -u origin main
+…or push an existing repository from the command line
+git remote add origin https://github.com/santequera1/taskAppDTGrowthPartners.git
+git branch -M main
+git push -u origin main
