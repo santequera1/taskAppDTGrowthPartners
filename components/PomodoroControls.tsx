@@ -1,28 +1,20 @@
 import React from 'react';
-import { Play, Pause, Square } from 'lucide-react';
+import { Play, Pause } from 'lucide-react';
 
 interface PomodoroControlsProps {
   isRunning: boolean;
-  onStart: () => void;
-  onPause: () => void;
-  onReset: () => void;
+  onToggle: () => void;
 }
 
-const PomodoroControls: React.FC<PomodoroControlsProps> = ({ isRunning, onStart, onPause, onReset }) => {
+const PomodoroControls: React.FC<PomodoroControlsProps> = ({ isRunning, onToggle }) => {
   return (
-    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-      {isRunning ? (
-        <button onClick={(e) => { e.stopPropagation(); onPause(); }} title="Pause" className="pomodoro-btn bg-slate-800 text-white p-2 rounded-md">
-          <Pause size={14} />
-        </button>
-      ) : (
-        <button onClick={(e) => { e.stopPropagation(); onStart(); }} title="Start" className="pomodoro-btn bg-green-600 text-white p-2 rounded-md">
-          <Play size={14} />
-        </button>
-      )}
-
-      <button onClick={(e) => { e.stopPropagation(); onReset(); }} title="Reset" className="pomodoro-btn bg-red-600 text-white p-2 rounded-md">
-        <Square size={14} />
+    <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
+      <button
+        onClick={(e) => { e.stopPropagation(); onToggle(); }}
+        title={isRunning ? 'Pausar' : 'Iniciar'}
+        className={`p-1.5 rounded-lg transition-all hover:scale-110 ${isRunning ? 'bg-amber-600 hover:bg-amber-500 text-white' : 'bg-slate-700 hover:bg-slate-600 text-slate-300'}`}
+      >
+        {isRunning ? <Pause size={14} /> : <Play size={14} />}
       </button>
     </div>
   );

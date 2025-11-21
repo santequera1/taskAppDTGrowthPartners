@@ -46,3 +46,9 @@ coverage-final.json
 *.key
 *.crt
 .pnpm-store/
+
+# Ignorar archivo de instrucciones
+subir_a_git.txt
+
+# Ignorar carpeta de actualizaciones
+ACTUALIZACIONES/

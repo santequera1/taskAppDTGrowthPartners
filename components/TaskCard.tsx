@@ -106,33 +106,40 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, project, onDelete, onEdit, on
         <p className={descriptionClasses}>{task.description}</p>
 
         {(task.startDate || task.dueDate) && (
-          <div className="mb-3 space-y-1.5">
+          <div className="mb-3">
             {task.startDate && !isMobile && (
               <div className="flex items-center gap-2 text-[10px] text-slate-400">
                 <Calendar size={12} className="text-slate-500" />
-                <span>Inicio: {formatDate(task.startDate)}</span>
+                <span>Creado: {formatDate(task.startDate)}</span>
               </div>
             )}
+
             {task.dueDate && (
-              <div className={`flex items-center gap-1.5 text-[10px] font-medium px-1.5 py-0.5 rounded-md ${dateBadgeColor}`}>
-                {task.status !== TaskStatus.DONE && isOverdue(task.dueDate) ? <AlertCircle size={12} /> : <Clock size={12} />}
-                <span>{task.status === TaskStatus.DONE ? 'Completada' : formatRelativeDate(task.dueDate)}</span>
+              <div className="flex items-start justify-between">
+                <div className={`flex items-center gap-1.5 text-[10px] font-medium px-1.5 py-0.5 rounded-md ${dateBadgeColor}`}>
+                  {task.status !== TaskStatus.DONE && isOverdue(task.dueDate) ? <AlertCircle size={12} /> : <Clock size={12} />}
+                  <span>{task.status === TaskStatus.DONE ? 'Completada' : formatRelativeDate(task.dueDate)}</span>
+                </div>
+
+                <div className="flex flex-col items-end">
+                  <div className="flex items-center gap-2">
+                    <PomodoroTimer
+                      taskId={task.id}
+                      initialTimeMs={task.currentPomodoroTime}
+                      initialStatus={task.pomodoroStatus as any}
+                      onComplete={onPomodoroComplete}
+                      onUpdate={onPomodoroUpdate}
+                      compact={true}
+                    />
+                  </div>
+                  { (task.totalPomodoros || 0) > 0 && (
+                    <div className="text-[10px] text-slate-400 mt-1">{task.totalPomodoros}</div>
+                  )}
+                </div>
               </div>
             )}
           </div>
         )}
-
-        {/* Pomodoro Section */}
-        <div className="mb-2 sm:mb-3">
-          <PomodoroTimer
-            taskId={task.id}
-            initialTimeMs={task.currentPomodoroTime}
-            initialStatus={task.pomodoroStatus as any}
-            onComplete={onPomodoroComplete}
-            onUpdate={onPomodoroUpdate}
-          />
-          <div className="mt-2 text-xs text-slate-400">{(task.totalPomodoros || 0)} 🍅</div>
-        </div>
       </div>
 
       <div className="pt-2 border-t border-slate-700/50 flex items-center justify-between">
