@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { Task, TaskStatus, Priority, TeamMemberName, Project, NewTask, NewProject, TaskType, TrackingPreset } from './types';
+import { Task, TaskStatus, Priority, TeamMemberName, Project, NewTask, NewProject, TaskType, TrackingPreset, TEAM_MEMBERS } from './types';
 import * as firestoreService from './lib/firestoreService';
 import { requestNotificationPermission } from './utils/pomodoroSound';
 import Column from './components/Column';
@@ -34,6 +34,9 @@ const App: React.FC = () => {
 
   // --- UI STATE ---
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [dateFilter, setDateFilter] = useState<DateFilterType>('all');
+  const [selectedMember, setSelectedMember] = useState<TeamMemberName | null>(null);
+  const [showCompleted, setShowCompleted] = useState(false);
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
@@ -41,7 +44,6 @@ const App: React.FC = () => {
   const [modalDefaultStatus, setModalDefaultStatus] = useState<TaskStatus>(TaskStatus.TODO);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [duplicatingTask, setDuplicatingTask] = useState<Task | null>(null);
-  const [dateFilter, setDateFilter] = useState<DateFilterType>('all');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [mobileActiveColumn, setMobileActiveColumn] = useState<TaskStatus>(TaskStatus.TODO);
 
@@ -95,6 +97,19 @@ const App: React.FC = () => {
 
   // --- HANDLERS ---
   const handleDropTask = useCallback(async (taskId: string, newStatus: TaskStatus) => {
+    const originalTasks = tasks;
+    const updatedTasks = tasks.map(task => task.id === taskId ? { ...task, status: newStatus } : task);
+    setTasks(updatedTasks);
+    try {
+      await firestoreService.updateTask(taskId, { status: newStatus });
+    } catch (err) {
+      console.error('updateTask (status) error', err);
+      setError('Error al actualizar el estado de la tarea.');
+      setTasks(originalTasks); // Revert on error
+    }
+  }, [tasks]);
+
+  const handleToggleComplete = useCallback(async (taskId: string, newStatus: TaskStatus) => {
     const originalTasks = tasks;
     const updatedTasks = tasks.map(task => task.id === taskId ? { ...task, status: newStatus } : task);
     setTasks(updatedTasks);
@@ -246,55 +261,90 @@ const App: React.FC = () => {
       setProjectToDelete(null);
   };
 
-  // --- FILTERING & DATA DERIVATION ---
-  const projectFilteredTasks = useMemo(() => activeProjectId ? tasks.filter(t => t.projectId === activeProjectId) : tasks, [tasks, activeProjectId]);
-
-  const dateFilteredTasks = useMemo(() => {
-    if (dateFilter === 'all') return projectFilteredTasks;
-    return projectFilteredTasks.filter(task => {
-      const now = Date.now();
-      const today = new Date().setHours(0, 0, 0, 0);
-      // Use dueDate if available, otherwise fall back to createdAt for time-based filters
-      const dateToCheck = task.dueDate ?? task.createdAt;
-      switch (dateFilter) {
-        case 'overdue':
-          // overdue only applies when there's a dueDate
-          return task.dueDate ? isOverdue(task.dueDate) && task.status !== TaskStatus.DONE : false;
-        case 'today':
-          if (!dateToCheck) return false;
-          return dateToCheck >= today && dateToCheck < today + 86400000;
-        case 'week':
-          if (!dateToCheck) return false;
-          return dateToCheck >= now && dateToCheck <= now + 7 * 86400000;
-        case 'month':
-          if (!dateToCheck) return false;
-          return dateToCheck >= now && dateToCheck <= now + 30 * 86400000;
-        default: return true;
-      }
+  // --- FILTERING ---
+  useEffect(() => {
+    console.log('🔍 Filtros activos:', {
+      activeProjectId,
+      dateFilter,
+      selectedMember,
+      showCompleted
     });
-  }, [projectFilteredTasks, dateFilter]);
+  }, [activeProjectId, dateFilter, selectedMember, showCompleted]);
+
+  // 1. Filtrar por proyecto
+  let filteredTasks = activeProjectId 
+    ? tasks.filter(t => t.projectId === activeProjectId)
+    : tasks;
+
+  console.log('1️⃣ Después de filtro proyecto:', filteredTasks.length);
+
+  // 2. Filtrar por miembro (CRÍTICO: debe ser ANTES de otros filtros)
+  if (selectedMember) {
+    filteredTasks = filteredTasks.filter(t => t.assignee === selectedMember);
+    console.log(`2️⃣ Después de filtro miembro (${selectedMember}):`, filteredTasks.length);
+  }
+
+  // 3. Filtrar por completadas
+  if (showCompleted) {
+    filteredTasks = filteredTasks.filter(t => t.status === TaskStatus.DONE);
+    console.log('3️⃣ Después de filtro completadas:', filteredTasks.length);
+  }
+
+  // 4. Aplicar filtro de fecha (dateFilteredTasks)
+  const dateFilteredTasks = filteredTasks.filter(task => {
+    if (dateFilter === 'all') return true;
+    
+    if (dateFilter === 'noDate') {
+      return !task.dueDate;
+    }
+    
+    if (!task.dueDate) return false;
+    
+    const now = Date.now();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayTimestamp = today.getTime();
+    const tomorrowTimestamp = todayTimestamp + 24 * 60 * 60 * 1000;
+    
+    switch (dateFilter) {
+      case 'overdue':
+        return isOverdue(task.dueDate) && task.status !== TaskStatus.DONE;
+      case 'today':
+        return task.dueDate >= todayTimestamp && task.dueDate < tomorrowTimestamp;
+      case 'week':
+        const weekFromNow = now + 7 * 24 * 60 * 60 * 1000;
+        return task.dueDate >= now && task.dueDate <= weekFromNow;
+      case 'month':
+        const monthFromNow = now + 30 * 24 * 60 * 60 * 1000;
+        return task.dueDate >= now && task.dueDate <= monthFromNow;
+      default:
+        return true;
+    }
+  });
+
+  console.log('4️⃣ Después de filtro fecha:', dateFilteredTasks.length);
 
   const counts = useMemo(() => {
     const now = Date.now();
     const todayStart = new Date().setHours(0, 0, 0, 0);
-    const calcDate = (t: typeof projectFilteredTasks[0]) => t.dueDate ?? t.createdAt;
+    const calcDate = (t: typeof filteredTasks[0]) => t.dueDate ?? t.createdAt;
     return {
-      overdue: projectFilteredTasks.filter(t => t.dueDate && isOverdue(t.dueDate) && t.status !== TaskStatus.DONE).length,
-      today: projectFilteredTasks.filter(t => {
+      overdue: filteredTasks.filter(t => t.dueDate && isOverdue(t.dueDate) && t.status !== TaskStatus.DONE).length,
+      today: filteredTasks.filter(t => {
         const d = calcDate(t);
         return d && d >= todayStart && d < todayStart + 86400000;
       }).length,
-      week: projectFilteredTasks.filter(t => {
+      week: filteredTasks.filter(t => {
         const d = calcDate(t);
         return d && d >= now && d <= now + 7 * 86400000;
       }).length,
-      total: projectFilteredTasks.length,
+      total: filteredTasks.length,
       filtered: dateFilteredTasks.length,
       [TaskStatus.TODO]: dateFilteredTasks.filter(t => t.status === TaskStatus.TODO).length,
       [TaskStatus.IN_PROGRESS]: dateFilteredTasks.filter(t => t.status === TaskStatus.IN_PROGRESS).length,
       [TaskStatus.DONE]: dateFilteredTasks.filter(t => t.status === TaskStatus.DONE).length,
     };
-  }, [projectFilteredTasks, dateFilteredTasks]);
+  }, [filteredTasks, dateFilteredTasks]);
   
   const taskCountsByProject = useMemo(() => {
     return tasks.reduce((acc, task) => {
@@ -307,7 +357,35 @@ const App: React.FC = () => {
   const todoTasks = tasksWithProjects.filter(t => t.status === TaskStatus.TODO);
   const inProgressTasks = tasksWithProjects.filter(t => t.status === TaskStatus.IN_PROGRESS);
   const doneTasks = tasksWithProjects.filter(t => t.status === TaskStatus.DONE);
-  const activeProjectName = activeProjectId ? projects.find(p => p.id === activeProjectId)?.name : 'Todos los Proyectos';
+  
+  const getHeaderTitle = () => {
+    if (selectedMember) {
+      return `📋 Tareas de ${selectedMember}`;
+    }
+    if (showCompleted) {
+      return '✓ Tareas Completadas';
+    }
+    if (activeProjectId) {
+      const project = projects.find(p => p.id === activeProjectId);
+      return project?.name || 'Proyecto';
+    }
+    return 'Todos los Proyectos';
+  };
+
+  const getHeaderSubtitle = () => {
+    const parts = [];
+    
+    if (selectedMember) parts.push(`Asignadas a ${selectedMember}`);
+    if (showCompleted) parts.push('Completadas');
+    if (activeProjectId) {
+      const project = projects.find(p => p.id === activeProjectId);
+      if(project) parts.push(project.name);
+    }
+    
+    return parts.length > 0 
+      ? `${dateFilteredTasks.length} tareas • ${parts.join(' • ')}`
+      : `${dateFilteredTasks.length} tareas en total`;
+  };
 
   // --- RENDER LOGIC ---
   if (isLoading) {
@@ -318,15 +396,22 @@ const App: React.FC = () => {
     );
   }
 
+  const handleSelectAssignee = (assignee: TeamMemberName | null) => {
+    setSelectedMember(assignee);
+    if (assignee) {
+      setShowCompleted(false);
+    }
+  };
+
   const renderDesktopView = () => (
     <>
-      <Sidebar projects={projects} activeProjectId={activeProjectId} tasks={projectFilteredTasks} onSelectProject={setActiveProjectId} onAddProject={openAddProjectModal} onEditProject={openEditProjectModal} onDeleteProject={initiateDeleteProject} />
+      <Sidebar projects={projects} activeProjectId={activeProjectId} tasks={tasks} onSelectProject={setActiveProjectId} onAddProject={openAddProjectModal} onEditProject={openEditProjectModal} onDeleteProject={initiateDeleteProject} activeAssignee={selectedMember} onSelectAssignee={handleSelectAssignee} showCompleted={showCompleted} onToggleShowCompleted={() => setShowCompleted(!showCompleted)} />
       <div className="flex-1 flex flex-col min-w-0">
         <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-xl sticky top-0 z-10 p-4 space-y-3">
             <div className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-lg font-semibold text-white">{activeProjectName}</h2>
-                    <p className="text-xs text-slate-500">{counts.filtered} de {counts.total} tareas</p>
+                    <h2 className="text-lg font-semibold text-white">{getHeaderTitle()}</h2>
+                    <p className="text-xs text-slate-500">{getHeaderSubtitle()}</p>
                 </div>
                 <button onClick={() => openNewTaskModal(TaskStatus.TODO)} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"><Plus size={18} /><span>Nueva Tarea</span></button>
             </div>
@@ -334,9 +419,9 @@ const App: React.FC = () => {
         </header>
         <main className="flex-1 overflow-x-auto overflow-y-hidden p-4">
             <div className="flex h-full gap-6 min-w-[1000px] mx-auto max-w-7xl">
-                <Column title="Tarea" status={TaskStatus.TODO} tasks={todoTasks} onDropTask={handleDropTask} onDeleteTask={handleDeleteTask} onAddTask={openNewTaskModal} onEditTask={openEditTaskModal} onDuplicateTask={openDuplicateTaskModal} icon={<Circle size={20} />} colorClass="text-blue-400" onPomodoroComplete={handlePomodoroComplete} onPomodoroUpdate={handlePomodoroUpdate} />
-                <Column title="En curso" status={TaskStatus.IN_PROGRESS} tasks={inProgressTasks} onDropTask={handleDropTask} onDeleteTask={handleDeleteTask} onAddTask={openNewTaskModal} onEditTask={openEditTaskModal} onDuplicateTask={openDuplicateTaskModal} icon={<Clock size={20} />} colorClass="text-amber-400" onPomodoroComplete={handlePomodoroComplete} onPomodoroUpdate={handlePomodoroUpdate} />
-                <Column title="Terminada" status={TaskStatus.DONE} tasks={doneTasks} onDropTask={handleDropTask} onDeleteTask={handleDeleteTask} onAddTask={openNewTaskModal} onEditTask={openEditTaskModal} onDuplicateTask={openDuplicateTaskModal} icon={<CheckCircle2 size={20} />} colorClass="text-emerald-400" onPomodoroComplete={handlePomodoroComplete} onPomodoroUpdate={handlePomodoroUpdate} />
+                <Column title="Tarea" status={TaskStatus.TODO} tasks={todoTasks} onDropTask={handleDropTask} onDeleteTask={handleDeleteTask} onAddTask={openNewTaskModal} onEditTask={openEditTaskModal} onDuplicateTask={openDuplicateTaskModal} onToggleComplete={handleToggleComplete} icon={<Circle size={20} />} colorClass="text-blue-400" onPomodoroComplete={handlePomodoroComplete} onPomodoroUpdate={handlePomodoroUpdate} />
+                <Column title="En curso" status={TaskStatus.IN_PROGRESS} tasks={inProgressTasks} onDropTask={handleDropTask} onDeleteTask={handleDeleteTask} onAddTask={openNewTaskModal} onEditTask={openEditTaskModal} onDuplicateTask={openDuplicateTaskModal} onToggleComplete={handleToggleComplete} icon={<Clock size={20} />} colorClass="text-amber-400" onPomodoroComplete={handlePomodoroComplete} onPomodoroUpdate={handlePomodoroUpdate} />
+                <Column title="Terminada" status={TaskStatus.DONE} tasks={doneTasks} onDropTask={handleDropTask} onDeleteTask={handleDeleteTask} onAddTask={openNewTaskModal} onEditTask={openEditTaskModal} onDuplicateTask={openDuplicateTaskModal} onToggleComplete={handleToggleComplete} icon={<CheckCircle2 size={20} />} colorClass="text-emerald-400" onPomodoroComplete={handlePomodoroComplete} onPomodoroUpdate={handlePomodoroUpdate} />
             </div>
         </main>
       </div>
@@ -353,21 +438,21 @@ const App: React.FC = () => {
 
     return (
         <>
-            <MobileHeader projects={projects} activeProjectId={activeProjectId} onSelectProject={setActiveProjectId} onOpenSidebar={() => setIsMobileSidebarOpen(true)} onNewTask={() => openNewTaskModal(mobileActiveColumn)} dateFilter={dateFilter} onDateFilterChange={setDateFilter} counts={{ overdue: counts.overdue, today: counts.today, week: counts.week, total: counts.total, filtered: counts.filtered }} />
+            <MobileHeader projects={projects} activeProjectId={activeProjectId} onSelectProject={setActiveProjectId} onOpenSidebar={() => setIsMobileSidebarOpen(true)} onNewTask={() => openNewTaskModal(mobileActiveColumn)} dateFilter={dateFilter} onDateFilterChange={setDateFilter} counts={{ overdue: counts.overdue, today: counts.today, week: counts.week, total: counts.total, filtered: counts.filtered }} activeAssignee={selectedMember} />
             <main className="flex-1 overflow-y-auto p-4 pb-20 w-full">
                 {mobileActiveColumn === TaskStatus.TODO && (
-                  <Column title={activeColumnData.title} status={mobileActiveColumn} tasks={activeColumnData.tasks} onDropTask={handleDropTask} onDeleteTask={handleDeleteTask} onAddTask={openNewTaskModal} onEditTask={openEditTaskModal} onDuplicateTask={openDuplicateTaskModal} icon={React.createElement(activeColumnData.icon, { size: 20 })} colorClass={activeColumnData.color} isMobile onPomodoroComplete={handlePomodoroComplete} onPomodoroUpdate={handlePomodoroUpdate} />
+                  <Column title={activeColumnData.title} status={mobileActiveColumn} tasks={activeColumnData.tasks} onDropTask={handleDropTask} onDeleteTask={handleDeleteTask} onAddTask={openNewTaskModal} onEditTask={openEditTaskModal} onDuplicateTask={openDuplicateTaskModal} onToggleComplete={handleToggleComplete} icon={React.createElement(activeColumnData.icon, { size: 20 })} colorClass={activeColumnData.color} isMobile onPomodoroComplete={handlePomodoroComplete} onPomodoroUpdate={handlePomodoroUpdate} />
                 )}
                 {mobileActiveColumn === TaskStatus.IN_PROGRESS && (
-                  <Column title={activeColumnData.title} status={mobileActiveColumn} tasks={activeColumnData.tasks} onDropTask={handleDropTask} onDeleteTask={handleDeleteTask} onAddTask={openNewTaskModal} onEditTask={openEditTaskModal} onDuplicateTask={openDuplicateTaskModal} icon={React.createElement(activeColumnData.icon, { size: 20 })} colorClass={activeColumnData.color} isMobile onPomodoroComplete={handlePomodoroComplete} onPomodoroUpdate={handlePomodoroUpdate} />
+                  <Column title={activeColumnData.title} status={mobileActiveColumn} tasks={activeColumnData.tasks} onDropTask={handleDropTask} onDeleteTask={handleDeleteTask} onAddTask={openNewTaskModal} onEditTask={openEditTaskModal} onDuplicateTask={openDuplicateTaskModal} onToggleComplete={handleToggleComplete} icon={React.createElement(activeColumnData.icon, { size: 20 })} colorClass={activeColumnData.color} isMobile onPomodoroComplete={handlePomodoroComplete} onPomodoroUpdate={handlePomodoroUpdate} />
                 )}
                 {mobileActiveColumn === TaskStatus.DONE && (
-                  <Column title={activeColumnData.title} status={mobileActiveColumn} tasks={activeColumnData.tasks} onDropTask={handleDropTask} onDeleteTask={handleDeleteTask} onAddTask={openNewTaskModal} onEditTask={openEditTaskModal} onDuplicateTask={openDuplicateTaskModal} icon={React.createElement(activeColumnData.icon, { size: 20 })} colorClass={activeColumnData.color} isMobile onPomodoroComplete={handlePomodoroComplete} onPomodoroUpdate={handlePomodoroUpdate} />
+                  <Column title={activeColumnData.title} status={mobileActiveColumn} tasks={activeColumnData.tasks} onDropTask={handleDropTask} onDeleteTask={handleDeleteTask} onAddTask={openNewTaskModal} onEditTask={openEditTaskModal} onDuplicateTask={openDuplicateTaskModal} onToggleComplete={handleToggleComplete} icon={React.createElement(activeColumnData.icon, { size: 20 })} colorClass={activeColumnData.color} isMobile onPomodoroComplete={handlePomodoroComplete} onPomodoroUpdate={handlePomodoroUpdate} />
                 )}
                 
             </main>
             <MobileBottomNav activeColumn={mobileActiveColumn} onColumnChange={setMobileActiveColumn} counts={{ [TaskStatus.TODO]: todoTasks.length, [TaskStatus.IN_PROGRESS]: inProgressTasks.length, [TaskStatus.DONE]: doneTasks.length }} />
-            <MobileSidebar isOpen={isMobileSidebarOpen} onClose={() => setIsMobileSidebarOpen(false)} projects={projects} activeProjectId={activeProjectId} onSelectProject={setActiveProjectId} onAddProject={openAddProjectModal} onEditProject={openEditProjectModal} onDeleteProject={initiateDeleteProject} taskCounts={taskCountsByProject} />
+            <MobileSidebar isOpen={isMobileSidebarOpen} onClose={() => setIsMobileSidebarOpen(false)} projects={projects} activeProjectId={activeProjectId} onSelectProject={setActiveProjectId} onAddProject={openAddProjectModal} onEditProject={openEditProjectModal} onDeleteProject={initiateDeleteProject} taskCounts={taskCountsByProject} activeAssignee={selectedMember} onSelectAssignee={setSelectedMember} />
         </>
     );
   };

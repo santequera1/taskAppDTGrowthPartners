@@ -1,7 +1,7 @@
 
 import React from 'react';
-import { Project } from '../types';
-import { X, Plus, Edit, Trash2 } from 'lucide-react';
+import { Project, TeamMemberName, TEAM_MEMBERS } from '../types';
+import { X, Plus, Edit, Trash2, User } from 'lucide-react';
 
 interface MobileSidebarProps {
   isOpen: boolean;
@@ -13,6 +13,8 @@ interface MobileSidebarProps {
   onEditProject: (project: Project) => void;
   onDeleteProject: (id: string) => void;
   taskCounts: { [key: string]: number };
+  activeAssignee: TeamMemberName | null;
+  onSelectAssignee: (assignee: TeamMemberName | null) => void;
 }
 
 const MobileSidebar: React.FC<MobileSidebarProps> = ({
@@ -24,7 +26,9 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({
   onAddProject,
   onEditProject,
   onDeleteProject,
-  taskCounts
+  taskCounts,
+  activeAssignee,
+  onSelectAssignee
 }) => {
   if (!isOpen) return null;
 
@@ -52,6 +56,19 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({
                 <Plus size={16} />
                 <span>Nuevo Proyecto</span>
             </button>
+        </div>
+
+        <div className="p-2 space-y-1">
+            <button onClick={() => { onSelectAssignee(null); onClose(); }} className={`w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md ${!activeAssignee ? 'bg-blue-600/20 text-blue-300' : 'hover:bg-slate-800'}`}>
+                <User size={16} />
+                <span>Todos los Usuarios</span>
+            </button>
+            {TEAM_MEMBERS.map(member => (
+                <button key={member.name} onClick={() => { onSelectAssignee(member.name); onClose(); }} className={`w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md ${activeAssignee === member.name ? 'bg-blue-600/20 text-blue-300' : 'hover:bg-slate-800'}`}>
+                  <div className={`w-2 h-2 rounded-full ${member.color}`} />
+                  <span>{member.name}</span>
+                </button>
+            ))}
         </div>
 
         <div className="flex-1 overflow-y-auto p-2 space-y-1">

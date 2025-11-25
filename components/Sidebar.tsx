@@ -1,5 +1,5 @@
 import React from 'react';
-import { Project, Task, TaskStatus, TEAM_MEMBERS } from '../types';
+import { Project, Task, TaskStatus, TEAM_MEMBERS, TeamMemberName } from '../types';
 import { Plus, Layers, Pencil, Trash2, PieChart, User } from 'lucide-react';
 
 interface SidebarProps {
@@ -10,16 +10,20 @@ interface SidebarProps {
   onAddProject: () => void;
   onEditProject: (project: Project) => void;
   onDeleteProject: (projectId: string) => void;
+  activeAssignee: TeamMemberName | null;
+  onSelectAssignee: (assignee: TeamMemberName | null) => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ 
-  projects, 
-  activeProjectId, 
+const Sidebar: React.FC<SidebarProps> = ({
+  projects,
+  activeProjectId,
   tasks,
-  onSelectProject, 
+  onSelectProject,
   onAddProject,
   onEditProject,
-  onDeleteProject
+  onDeleteProject,
+  activeAssignee,
+  onSelectAssignee
 }) => {
   
   // Calculate stats based on the passed tasks
@@ -136,6 +140,67 @@ const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </div>
 
+          {/* Users / Assignees */}
+          <div>
+            <div className="flex items-center justify-between mb-2 px-2">
+              <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Usuarios</h3>
+            </div>
+
+            <div className="space-y-1">
+              {TEAM_MEMBERS.map(member => {
+                const memberTasksCount = tasks.filter(t => 
+                  t.assignee === member.name &&
+                  (!activeProjectId || t.projectId === activeProjectId)
+                ).length;
+                
+                const isActive = activeAssignee === member.name;
+                
+                return (
+                  <button
+                    key={member.name}
+                    onClick={() => {
+                      if (isActive) {
+                        onSelectAssignee(null);
+                      } else {
+                        onSelectAssignee(member.name);
+                      }
+                    }}
+                    className={`w-full text-left px-3 py-2 rounded-lg transition-all ${
+                      isActive
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-slate-800/50 text-slate-300 hover:bg-slate-800'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-6 h-6 rounded-full ${member.color} flex items-center justify-center text-xs font-bold text-white`}>
+                          {member.initials}
+                        </div>
+                        {member.name}
+                      </div>
+                      <span className={`text-xs font-mono px-2 py-0.5 rounded-full ${isActive ? 'bg-white/20' : 'bg-slate-700'}`}>
+                        {memberTasksCount}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+
+              {activeAssignee && (
+                <button
+                  onClick={() => {
+                    onSelectAssignee(null);
+                    console.log('🧹 Filtro de miembro limpiado');
+                  }}
+                  className="w-full mt-2 px-4 py-2 text-sm text-red-400 hover:text-red-300 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Trash2 size={14} />
+                  Limpiar filtro de miembro
+                </button>
+              )}
+            </div>
+          </div>
+
           {/* Dashboard Summary Section */}
           <div className="pt-4 border-t border-slate-800">
              <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 px-2 flex items-center gap-2">
@@ -161,27 +226,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                 </div>
              </div>
 
-             <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 px-2 flex items-center gap-2 mt-6">
-                <User size={14} /> Carga de Trabajo
-             </h3>
-             <div className="space-y-2 px-1">
-                {workload.map(member => (
-                   member.count > 0 && (
-                    <div key={member.name} className="flex items-center justify-between text-sm group">
-                        <div className="flex items-center gap-2">
-                            <div className={`w-2 h-2 rounded-full ${member.color}`} />
-                            <span className="text-slate-400 group-hover:text-slate-200 transition-colors">{member.name}</span>
-                        </div>
-                        <span className="bg-slate-800 text-slate-300 text-xs font-medium px-2 py-0.5 rounded-full">
-                            {member.count}
-                        </span>
-                    </div>
-                   )
-                ))}
-                {workload.every(m => m.count === 0) && (
-                    <p className="text-xs text-slate-600 italic px-2">Sin tareas asignadas</p>
-                )}
-             </div>
           </div>
 
         </div>

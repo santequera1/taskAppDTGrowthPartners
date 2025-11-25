@@ -2,7 +2,7 @@ import React from 'react';
 import { Task, Priority, TEAM_MEMBERS, Project, TaskStatus, TRACKING_PRESETS } from '../types';
 import PomodoroTimer from './PomodoroTimer';
 import PomodoroHistory from './PomodoroHistory';
-import { GripVertical, Trash2, ArrowRight, Copy, Calendar, Clock, AlertCircle } from 'lucide-react';
+import { GripVertical, Trash2, ArrowRight, Copy, Calendar, Clock, AlertCircle, Check } from 'lucide-react';
 import { formatDate, formatRelativeDate, getDateBadgeColor, isOverdue } from '../utils/dateUtils';
 
 interface TaskCardProps {
@@ -11,12 +11,13 @@ interface TaskCardProps {
   onDelete: (id: string) => void;
   onEdit: (task: Task) => void;
   onDuplicate: (task: Task) => void;
+  onToggleComplete: (id: string, status: TaskStatus) => void;
   isMobile?: boolean;
   onPomodoroComplete?: (taskId: string, session: import('../types').PomodoroSession) => void;
   onPomodoroUpdate?: (taskId: string, state: { pomodoroStatus?: string; currentPomodoroTime?: number | null }) => void;
 }
 
-const TaskCard: React.FC<TaskCardProps> = ({ task, project, onDelete, onEdit, onDuplicate, isMobile = false, onPomodoroComplete, onPomodoroUpdate }) => {
+const TaskCard: React.FC<TaskCardProps> = ({ task, project, onDelete, onEdit, onDuplicate, onToggleComplete, isMobile = false, onPomodoroComplete, onPomodoroUpdate }) => {
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
     if (isMobile) {
       e.preventDefault();
@@ -81,6 +82,22 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, project, onDelete, onEdit, on
               onMouseDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
+                const newStatus = task.status === TaskStatus.DONE ? TaskStatus.IN_PROGRESS : TaskStatus.DONE;
+                onToggleComplete(task.id, newStatus);
+              }}
+              className={`p-1.5 rounded-lg transition-colors z-10 ${
+                task.status === TaskStatus.DONE
+                  ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+                  : 'bg-slate-800/50 text-slate-500 hover:text-white hover:bg-slate-700/80'
+              }`}
+              title={task.status === TaskStatus.DONE ? "Marcar como 'En Progreso'" : "Completar Tarea"}
+            >
+              <Check size={isMobile ? 12 : 14} />
+            </button>
+            <button
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
                 onDuplicate(task);
               }}
               className="text-slate-500 hover:text-blue-400 hover:bg-slate-700/80 bg-slate-800/50 p-1.5 rounded-lg transition-colors z-10"
@@ -104,6 +121,30 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, project, onDelete, onEdit, on
 
         <h3 className={`font-semibold text-slate-200 mb-1 pr-4 leading-snug ${isMobile ? 'text-sm' : ''}`}>{task.title}</h3>
         <p className={descriptionClasses}>{task.description}</p>
+
+        {/* Image thumbnails */}
+        {task.images && task.images.length > 0 && (
+          <div className="mb-2 flex gap-1">
+            {task.images.slice(0, 3).map(image => (
+              <img
+                key={image.id}
+                src={image.url}
+                alt=""
+                className="w-12 h-12 object-cover rounded border border-slate-700"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // Abrir lightbox
+                }}
+              />
+            ))}
+            {task.images.length > 3 && (
+              <div className="w-12 h-12 bg-slate-800 border border-slate-700 
+                              rounded flex items-center justify-center text-xs text-slate-400">
+                +{task.images.length - 3}
+              </div>
+            )}
+          </div>
+        )}
 
         {(task.startDate || task.dueDate) && (
           <div className="mb-3">

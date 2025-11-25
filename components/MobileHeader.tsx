@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Project } from '../types';
+import { Project, TeamMemberName, TEAM_MEMBERS } from '../types';
 import { Menu, Plus, ChevronDown, Filter } from 'lucide-react';
 import DateFilter, { DateFilterType } from './DateFilter';
 
@@ -13,6 +13,7 @@ interface MobileHeaderProps {
   dateFilter: DateFilterType;
   onDateFilterChange: (filter: DateFilterType) => void;
   counts: { overdue: number; today: number; week: number; total: number; filtered: number };
+  activeAssignee: TeamMemberName | null;
 }
 
 const MobileHeader: React.FC<MobileHeaderProps> = ({
@@ -24,12 +25,15 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
   dateFilter,
   onDateFilterChange,
   counts,
+  activeAssignee,
 }) => {
   const [isProjectSelectorOpen, setIsProjectSelectorOpen] = useState(false);
   const [areFiltersVisible, setAreFiltersVisible] = useState(false);
 
   const activeProject = projects.find(p => p.id === activeProjectId);
+  const activeAssigneeName = activeAssignee ? TEAM_MEMBERS.find(m => m.name === activeAssignee)?.name : null;
   const activeProjectName = activeProject ? activeProject.name : 'Todos los Proyectos';
+  const displayName = activeAssigneeName ? `${activeProjectName} - ${activeAssigneeName}` : activeProjectName;
 
   return (
     <header className="bg-slate-900/80 backdrop-blur-xl border-b border-slate-800 p-3 space-y-3 sticky top-0 z-20">
@@ -40,7 +44,7 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
           </button>
           <div className="relative">
             <button onClick={() => setIsProjectSelectorOpen(!isProjectSelectorOpen)} className="flex items-center gap-1">
-              <span className="font-semibold text-white max-w-[150px] truncate">{activeProjectName}</span>
+              <span className="font-semibold text-white max-w-[150px] truncate">{displayName}</span>
               <ChevronDown size={16} className={`transition-transform ${isProjectSelectorOpen ? 'rotate-180' : ''}`} />
             </button>
             {isProjectSelectorOpen && (

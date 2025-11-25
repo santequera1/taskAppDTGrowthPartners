@@ -88,3 +88,11 @@ export const updateTaskPomodoroState = async (
   Object.keys(payload).forEach(k => { if (payload[k] === undefined) delete payload[k]; });
   await updateDoc(taskDoc, payload);
 };
+
+export const updateTaskImages = async (taskId: string, images: any[]): Promise<void> => {
+  const taskRef = doc(db, TASKS_COLLECTION, taskId);
+  await updateDoc(taskRef, {
+    images: images,
+    imageCount: images.length
+  });
+};

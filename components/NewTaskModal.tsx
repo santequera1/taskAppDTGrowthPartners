@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Task, TaskStatus, Priority, TeamMemberName, TEAM_MEMBERS, Project, TASK_TYPES, TaskType, TRACKING_PRESETS, TrackingPreset } from '../types';
-import { X, Save, User, UserPlus, Folder, PenLine, Copy, Calendar, CalendarClock } from 'lucide-react';
+import { X, Save, User, UserPlus, Folder, PenLine, Copy, Calendar, CalendarClock, UploadCloud, Trash2 } from 'lucide-react';
 import PomodoroHistory from './PomodoroHistory';
 import { timestampToInputDate, inputDateToTimestamp } from '../utils/dateUtils';
+import { uploadTaskImage } from '../lib/storageService';
+import { updateTask } from '../lib/firestoreService';
 
 interface NewTaskModalProps {
   isOpen: boolean;
@@ -18,7 +20,8 @@ interface NewTaskModalProps {
     startDate?: number,
     dueDate?: number,
     type?: TaskType,
-    trackingPreset?: TrackingPreset
+    trackingPreset?: TrackingPreset,
+    images?: string[]
   ) => void;
   initialStatus: TaskStatus;
   projects: Project[];
@@ -27,7 +30,7 @@ interface NewTaskModalProps {
   taskToDuplicate?: Task | null;
 }
 
-const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, onSave, initialStatus, projects, activeProjectId, taskToEdit, taskToDuplicate }) => {
+const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, onSave, initialStatus, projects, activeProjectId, taskToEdit: editingTask, taskToDuplicate }) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<Priority>(Priority.MEDIUM);
@@ -39,12 +42,16 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, onSave, in
   const [dueDate, setDueDate] = useState<string>('');
   const [type, setType] = useState<TaskType>(TASK_TYPES[0]);
   const [trackingPreset, setTrackingPreset] = useState<TrackingPreset | ''>('');
+  const [images, setImages] = useState<string[]>([]);
+  
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
-      const task = taskToEdit || taskToDuplicate;
+      const task = editingTask || taskToDuplicate;
       if (task) {
-        setTitle(taskToEdit ? task.title : `${task.title} (Copia)`);
+        setTitle(editingTask ? task.title : `${task.title} (Copia)`);
         setDescription(task.description);
         setPriority(task.priority);
         setStatus(task.status);
@@ -55,8 +62,9 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, onSave, in
         setDueDate(timestampToInputDate(task.dueDate));
         setType((task as Task).type || TASK_TYPES[0]);
         setTrackingPreset((task as Task).trackingPreset || '' as any);
+        setImages(task.images || []);
       } else {
-        // Create Mode: prefills to today's date to avoid empty-date errors
+        // Create Mode
         const todayInput = timestampToInputDate(Date.now());
         setTitle('');
         setDescription('');
@@ -69,11 +77,11 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, onSave, in
         setDueDate(todayInput);
         setType(TASK_TYPES[0]);
         setTrackingPreset('');
+        setImages([]);
       }
     }
-  }, [isOpen, taskToEdit, taskToDuplicate, initialStatus, activeProjectId, projects]);
+  }, [isOpen, editingTask, taskToDuplicate, initialStatus, activeProjectId, projects]);
 
-  // Close modal on Escape key when it's open
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -82,11 +90,61 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, onSave, in
     return () => window.removeEventListener('keydown', handleEsc);
   }, [isOpen, onClose]);
 
+  const handleImageUpload = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      alert('Solo se permiten imágenes');
+      return;
+    }
+    
+    if (file.size > 5 * 1024 * 1024) {
+      alert('La imagen no debe superar 5MB');
+      return;
+    }
+    
+    setUploading(true);
+    setUploadProgress(0);
+    
+    try {
+      console.log('🖼️ Subiendo imagen:', file.name);
+      
+      const taskId = editingTask?.id || `temp_${Date.now()}`;
+      
+      const imageUrl = await uploadTaskImage(
+        taskId, 
+        file, 
+        creator,
+        (progress) => {
+          setUploadProgress(progress);
+          console.log(`Progreso: ${progress.toFixed(1)}%`);
+        }
+      );
+      
+      console.log('✅ Imagen subida:', imageUrl);
+      
+      const newImages = [...(images || []), imageUrl];
+      setImages(newImages);
+      
+      if (editingTask) {
+        await updateTask(editingTask.id, { images: newImages });
+      }
+      
+      alert('Imagen subida correctamente');
+      
+    } catch (error: any) {
+      console.error('❌ Error completo:', error);
+      alert(`Error al subir imagen: ${error.message}`);
+    } finally {
+      setUploading(false);
+      setUploadProgress(0);
+    }
+  };
+
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !projectId) return;
+
     onSave(
       title,
       description,
@@ -98,18 +156,19 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, onSave, in
       inputDateToTimestamp(startDate),
       inputDateToTimestamp(dueDate),
       type,
-      trackingPreset || undefined
+      trackingPreset || undefined,
+      images
     );
   };
 
   const getModalTitle = () => {
-      if (taskToEdit) return 'Editar Tarea';
+      if (editingTask) return 'Editar Tarea';
       if (taskToDuplicate) return 'Duplicar Tarea';
       return 'Nueva Tarea';
   };
 
   const getModalIcon = () => {
-    if (taskToEdit) return <PenLine size={18} className="text-blue-500" />;
+    if (editingTask) return <PenLine size={18} className="text-blue-500" />;
     if (taskToDuplicate) return <Copy size={18} className="text-blue-500" />;
     return null;
   };
@@ -173,6 +232,60 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, onSave, in
               rows={3}
               className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 md:p-3 text-sm md:text-base text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none transition-all"
             />
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-slate-300">
+              Imágenes
+              {uploading && (
+                <span className="ml-2 text-xs text-blue-400">
+                  Subiendo {uploadProgress.toFixed(0)}%
+                </span>
+              )}
+            </label>
+            <input
+              type="file"
+              id="image-upload"
+              accept="image/*"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleImageUpload(file);
+              }}
+              disabled={uploading}
+              className="hidden"
+            />
+            <label htmlFor="image-upload" className={`flex items-center justify-center w-full px-4 py-3 border-2 border-dashed border-slate-700 rounded-lg cursor-pointer hover:bg-slate-800 transition-colors ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                <UploadCloud size={18} className="mr-2 text-slate-500" />
+                <span className="text-sm text-slate-400">Adjuntar imagen (max 5MB)</span>
+            </label>
+
+            {uploading && (
+              <div className="w-full bg-slate-700 rounded-full h-1.5 mt-2">
+                <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: `${uploadProgress}%` }}></div>
+              </div>
+            )}
+
+            {images && images.length > 0 && (
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 pt-2">
+                {images.map((url, index) => (
+                  <div key={index} className="relative group aspect-square">
+                    <img src={url} alt={`Task image ${index + 1}`} className="w-full h-full object-cover rounded-lg border border-slate-700" />
+                    <button
+                      onClick={() => {
+                        const newImages = images.filter((_, i) => i !== index);
+                        setImages(newImages);
+                        if (editingTask) {
+                          updateTask(editingTask.id, { images: newImages });
+                        }
+                      }}
+                      className="absolute top-1 right-1 p-1 bg-red-600 hover:bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4 md:gap-6">
@@ -291,13 +404,13 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, onSave, in
               className="flex-1 px-4 py-2 md:px-5 md:py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm md:text-base font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Save size={16} />
-              {taskToEdit ? 'Actualizar' : taskToDuplicate ? 'Crear Copia' : 'Guardar'}
+              {editingTask ? 'Actualizar' : taskToDuplicate ? 'Crear Copia' : 'Guardar'}
             </button>
           </div>
-          {taskToEdit && (
+          {editingTask && (
             <div className="pt-4">
               <h3 className="text-sm font-semibold text-slate-200 mb-2">Historial de Pomodoros</h3>
-              <PomodoroHistory sessions={taskToEdit.pomodoroSessions} />
+              <PomodoroHistory sessions={editingTask.pomodoroSessions} />
             </div>
           )}
         </form>
