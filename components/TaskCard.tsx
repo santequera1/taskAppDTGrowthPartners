@@ -12,12 +12,14 @@ interface TaskCardProps {
   onEdit: (task: Task) => void;
   onDuplicate: (task: Task) => void;
   onToggleComplete: (id: string, status: TaskStatus) => void;
+  onOpenImageModal?: (imageSrc: string) => void;
   isMobile?: boolean;
   onPomodoroComplete?: (taskId: string, session: import('../types').PomodoroSession) => void;
   onPomodoroUpdate?: (taskId: string, state: { pomodoroStatus?: string; currentPomodoroTime?: number | null }) => void;
 }
 
-const TaskCard: React.FC<TaskCardProps> = ({ task, project, onDelete, onEdit, onDuplicate, onToggleComplete, isMobile = false, onPomodoroComplete, onPomodoroUpdate }) => {
+const TaskCard: React.FC<TaskCardProps> = ({ task, project, onDelete, onEdit, onDuplicate, onToggleComplete, onOpenImageModal, isMobile = false, onPomodoroComplete, onPomodoroUpdate }) => {
+
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
     if (isMobile) {
       e.preventDefault();
@@ -129,13 +131,12 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, project, onDelete, onEdit, on
                 key={index}
                 src={base64}
                 alt={`Img ${index + 1}`}
-                className="w-12 h-12 object-cover rounded border border-slate-700
+                className="w-12 h-16 object-contain rounded border border-slate-700
                            hover:scale-110 transition-transform cursor-pointer"
                 onClick={(e) => {
                   e.stopPropagation();
-                  // Abrir modal o ventana
-                  const newWindow = window.open();
-                  newWindow?.document.write(`<img src="${base64}" style="max-width:100%"/>`);
+                  e.preventDefault();
+                  onOpenImageModal?.(base64);
                 }}
               />
             ))}
@@ -207,6 +208,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, project, onDelete, onEdit, on
           </div>
         )}
       </div>
+
     </div>
   );
 };

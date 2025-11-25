@@ -10,12 +10,12 @@ interface NewTaskModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (
-    title: string, 
-    description: string, 
-    priority: Priority, 
-    status: TaskStatus, 
-    assignee: TeamMemberName, 
-    creator: TeamMemberName, 
+    title: string,
+    description: string,
+    priority: Priority,
+    status: TaskStatus,
+    assignee: TeamMemberName,
+    creator: TeamMemberName,
     projectId: string,
     startDate?: number,
     dueDate?: number,
@@ -23,6 +23,7 @@ interface NewTaskModalProps {
     trackingPreset?: TrackingPreset,
     images?: string[]
   ) => void;
+  onTaskUpdate?: (taskId: string, updates: Partial<Task>) => void;
   initialStatus: TaskStatus;
   projects: Project[];
   activeProjectId: string | null;
@@ -30,7 +31,7 @@ interface NewTaskModalProps {
   taskToDuplicate?: Task | null;
 }
 
-const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, onSave, initialStatus, projects, activeProjectId, taskToEdit: editingTask, taskToDuplicate }) => {
+const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, onSave, onTaskUpdate, initialStatus, projects, activeProjectId, taskToEdit: editingTask, taskToDuplicate }) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<Priority>(Priority.MEDIUM);
@@ -90,6 +91,24 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, onSave, in
     return () => window.removeEventListener('keydown', handleEsc);
   }, [isOpen, onClose]);
 
+  // Handler para pegar imágenes desde portapapeles
+  const handlePaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (file) {
+          await handleImageUpload(file);
+        }
+        break; // Solo procesar la primera imagen
+      }
+    }
+  };
+
   const handleImageUpload = async (file: File) => {
     // Validar
     const validation = validateImage(file);
@@ -127,9 +146,10 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, onSave, in
 
       console.log('✅ Imagen agregada');
 
-      // Si editar tarea existente, actualizar Firestore
+      // Si editar tarea existente, actualizar Firestore y estado local
       if (editingTask) {
         await updateTask(editingTask.id, { images: newImages });
+        onTaskUpdate?.(editingTask.id, { images: newImages });
       }
 
     } catch (error) {
@@ -154,9 +174,10 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, onSave, in
     const newImages = images.filter((_, i) => i !== index);
     setImages(newImages);
 
-    // Si estamos editando una tarea existente, actualizar en Firestore
+    // Si estamos editando una tarea existente, actualizar en Firestore y estado local
     if (editingTask) {
       updateTask(editingTask.id, { images: newImages });
+      onTaskUpdate?.(editingTask.id, { images: newImages });
       console.log('💾 Firestore actualizado - imagen eliminada');
     }
   };
@@ -251,6 +272,7 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, onSave, in
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+              onPaste={handlePaste}
               placeholder="Detalles adicionales..."
               rows={3}
               className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 md:p-3 text-sm md:text-base text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none transition-all"
@@ -319,7 +341,7 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, onSave, in
                     <img
                       src={base64}
                       alt={`Imagen ${index + 1}`}
-                      className="w-full h-20 object-cover rounded-lg border border-slate-700"
+                      className="w-full h-24 object-contain rounded-lg border border-slate-700"
                     />
                     <button
                       type="button"

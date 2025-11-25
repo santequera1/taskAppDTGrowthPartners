@@ -13,6 +13,7 @@ interface ColumnProps {
   onEditTask: (task: Task) => void;
   onDuplicateTask: (task: Task) => void;
   onToggleComplete: (id: string, status: TaskStatus) => void;
+  onOpenImageModal?: (imageSrc: string) => void;
   icon: React.ReactNode;
   colorClass: string;
   isMobile?: boolean;
@@ -20,16 +21,17 @@ interface ColumnProps {
   onPomodoroUpdate?: (taskId: string, state: { pomodoroStatus?: string; currentPomodoroTime?: number | null }) => void;
 }
 
-const Column: React.FC<ColumnProps> = ({ 
-  title, 
-  status, 
-  tasks, 
-  onDropTask, 
+const Column: React.FC<ColumnProps> = ({
+  title,
+  status,
+  tasks,
+  onDropTask,
   onDeleteTask,
   onAddTask,
   onEditTask,
   onDuplicateTask,
   onToggleComplete,
+  onOpenImageModal,
   icon,
   colorClass,
   isMobile = false,
@@ -101,13 +103,14 @@ const Column: React.FC<ColumnProps> = ({
       <div className={`flex-1 overflow-y-auto min-h-[200px] custom-scrollbar ${isMobile ? 'p-1' : 'p-3'}`}>
         <div className={`flex flex-col ${isMobile ? 'gap-3' : 'gap-4'}`}>
           {tasks.map((task) => (
-            <TaskCard 
-              key={task.id} 
-              task={task} 
-              onDelete={onDeleteTask} 
+            <TaskCard
+              key={task.id}
+              task={task}
+              onDelete={onDeleteTask}
               onEdit={onEditTask}
               onDuplicate={onDuplicateTask}
               onToggleComplete={onToggleComplete}
+              onOpenImageModal={onOpenImageModal}
               project={(task as any).project}
               isMobile={isMobile}
               onPomodoroComplete={onPomodoroComplete}
