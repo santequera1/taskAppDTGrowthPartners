@@ -84,7 +84,7 @@ export interface Task {
   createdAt: number;
   startDate?: number;
   dueDate?: number;
-  images?: string[];  // ← Array simple de URLs
+  images?: string[];  // Array de Base64 strings
   // Pomodoro fields
   pomodoroSessions?: PomodoroSession[];
   totalPomodoros?: number;

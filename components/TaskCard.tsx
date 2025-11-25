@@ -122,24 +122,26 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, project, onDelete, onEdit, on
         <h3 className={`font-semibold text-slate-200 mb-1 pr-4 leading-snug ${isMobile ? 'text-sm' : ''}`}>{task.title}</h3>
         <p className={descriptionClasses}>{task.description}</p>
 
-        {/* Image thumbnails */}
         {task.images && task.images.length > 0 && (
-          <div className="mb-2 flex gap-1">
-            {task.images.slice(0, 3).map(image => (
+          <div className="mb-2 flex gap-1 flex-wrap">
+            {task.images.slice(0, 3).map((base64, index) => (
               <img
-                key={image.id}
-                src={image.url}
-                alt=""
-                className="w-12 h-12 object-cover rounded border border-slate-700"
+                key={index}
+                src={base64}
+                alt={`Img ${index + 1}`}
+                className="w-12 h-12 object-cover rounded border border-slate-700
+                           hover:scale-110 transition-transform cursor-pointer"
                 onClick={(e) => {
                   e.stopPropagation();
-                  // Abrir lightbox
+                  // Abrir modal o ventana
+                  const newWindow = window.open();
+                  newWindow?.document.write(`<img src="${base64}" style="max-width:100%"/>`);
                 }}
               />
             ))}
             {task.images.length > 3 && (
-              <div className="w-12 h-12 bg-slate-800 border border-slate-700 
-                              rounded flex items-center justify-center text-xs text-slate-400">
+              <div className="w-12 h-12 bg-slate-800 border border-slate-700 rounded
+                              flex items-center justify-center text-xs text-slate-400">
                 +{task.images.length - 3}
               </div>
             )}

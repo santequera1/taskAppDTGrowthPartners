@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Task, TaskStatus, Priority, TeamMemberName, TEAM_MEMBERS, Project, TASK_TYPES, TaskType, TRACKING_PRESETS, TrackingPreset } from '../types';
-import { X, Save, User, UserPlus, Folder, PenLine, Copy, Calendar, CalendarClock, UploadCloud, Trash2 } from 'lucide-react';
+import { X, Save, User, UserPlus, Folder, PenLine, Copy, Calendar, CalendarClock, Upload } from 'lucide-react';
 import PomodoroHistory from './PomodoroHistory';
 import { timestampToInputDate, inputDateToTimestamp } from '../utils/dateUtils';
-import { uploadTaskImage } from '../lib/storageService';
+import { convertImageToBase64, validateImage } from '../lib/imageService';
 import { updateTask } from '../lib/firestoreService';
 
 interface NewTaskModalProps {
@@ -43,9 +43,9 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, onSave, in
   const [type, setType] = useState<TaskType>(TASK_TYPES[0]);
   const [trackingPreset, setTrackingPreset] = useState<TrackingPreset | ''>('');
   const [images, setImages] = useState<string[]>([]);
-  
-  const [uploadProgress, setUploadProgress] = useState(0);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -91,53 +91,76 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, onSave, in
   }, [isOpen, onClose]);
 
   const handleImageUpload = async (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      alert('Solo se permiten imágenes');
+    // Validar
+    const validation = validateImage(file);
+    if (!validation.valid) {
+      alert(`❌ ${validation.error}`);
       return;
     }
-    
-    if (file.size > 5 * 1024 * 1024) {
-      alert('La imagen no debe superar 5MB');
+
+    // Límite de imágenes
+    if (images.length >= 5) {
+      alert('❌ Máximo 5 imágenes por tarea');
       return;
     }
-    
+
     setUploading(true);
     setUploadProgress(0);
-    
+
     try {
-      console.log('🖼️ Subiendo imagen:', file.name);
-      
-      const taskId = editingTask?.id || `temp_${Date.now()}`;
-      
-      const imageUrl = await uploadTaskImage(
-        taskId, 
-        file, 
-        creator,
-        (progress) => {
-          setUploadProgress(progress);
-          console.log(`Progreso: ${progress.toFixed(1)}%`);
-        }
-      );
-      
-      console.log('✅ Imagen subida:', imageUrl);
-      
-      const newImages = [...(images || []), imageUrl];
+      console.log('🔄 Procesando imagen...');
+
+      // Simular progreso
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => Math.min(prev + 10, 90));
+      }, 100);
+
+      // Convertir a Base64
+      const base64 = await convertImageToBase64(file);
+
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+
+      // Agregar a la lista
+      const newImages = [...images, base64];
       setImages(newImages);
-      
+
+      console.log('✅ Imagen agregada');
+
+      // Si editar tarea existente, actualizar Firestore
       if (editingTask) {
         await updateTask(editingTask.id, { images: newImages });
       }
-      
-      alert('Imagen subida correctamente');
-      
-    } catch (error: any) {
-      console.error('❌ Error completo:', error);
-      alert(`Error al subir imagen: ${error.message}`);
+
+    } catch (error) {
+      console.error('❌ Error:', error);
+      alert(`Error: ${error.message}`);
     } finally {
-      setUploading(false);
-      setUploadProgress(0);
+      setTimeout(() => {
+        setUploading(false);
+        setUploadProgress(0);
+      }, 300);
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
+
+  // Handler para eliminar imagen
+  const handleRemoveImage = (index: number) => {
+    console.log('🗑️ Eliminando imagen:', index);
+
+    const newImages = images.filter((_, i) => i !== index);
+    setImages(newImages);
+
+    // Si estamos editando una tarea existente, actualizar en Firestore
+    if (editingTask) {
+      updateTask(editingTask.id, { images: newImages });
+      console.log('💾 Firestore actualizado - imagen eliminada');
+    }
+  };
+
 
   if (!isOpen) return null;
 
@@ -234,53 +257,78 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, onSave, in
             />
           </div>
 
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-slate-300">
-              Imágenes
+          {/* Sección de Imágenes */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              Imágenes adjuntas
               {uploading && (
                 <span className="ml-2 text-xs text-blue-400">
-                  Subiendo {uploadProgress.toFixed(0)}%
+                  Procesando {uploadProgress}%
                 </span>
               )}
             </label>
+
+            {/* Botón upload */}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading || images.length >= 5}
+              className={`w-full px-4 py-3 border-2 border-dashed rounded-lg
+                         transition-all flex items-center justify-center gap-2
+                         ${uploading || images.length >= 5
+                           ? 'border-slate-700 bg-slate-800/50 text-slate-600 cursor-not-allowed'
+                           : 'border-slate-600 hover:border-blue-500 bg-slate-800/30 text-slate-400'
+                         }`}
+            >
+              <Upload size={18} />
+              <span className="text-sm">
+                {uploading ? 'Procesando...' : images.length >= 5 ? 'Límite (5/5)' : 'Subir imagen'}
+              </span>
+            </button>
+
             <input
+              ref={fileInputRef}
               type="file"
-              id="image-upload"
               accept="image/*"
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) handleImageUpload(file);
               }}
-              disabled={uploading}
               className="hidden"
             />
-            <label htmlFor="image-upload" className={`flex items-center justify-center w-full px-4 py-3 border-2 border-dashed border-slate-700 rounded-lg cursor-pointer hover:bg-slate-800 transition-colors ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                <UploadCloud size={18} className="mr-2 text-slate-500" />
-                <span className="text-sm text-slate-400">Adjuntar imagen (max 5MB)</span>
-            </label>
 
+            <p className="text-xs text-slate-500 text-center mt-2">
+              {images.length}/5 • Max 5MB • Se comprime automáticamente
+            </p>
+
+            {/* Progress bar */}
             {uploading && (
-              <div className="w-full bg-slate-700 rounded-full h-1.5 mt-2">
-                <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: `${uploadProgress}%` }}></div>
+              <div className="mt-2 w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+                <div
+                  className="bg-blue-600 h-full transition-all duration-300"
+                  style={{ width: `${uploadProgress}%` }}
+                />
               </div>
             )}
 
-            {images && images.length > 0 && (
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 pt-2">
-                {images.map((url, index) => (
-                  <div key={index} className="relative group aspect-square">
-                    <img src={url} alt={`Task image ${index + 1}`} className="w-full h-full object-cover rounded-lg border border-slate-700" />
+            {/* Grid imágenes */}
+            {images.length > 0 && (
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                {images.map((base64, index) => (
+                  <div key={index} className="relative group">
+                    <img
+                      src={base64}
+                      alt={`Imagen ${index + 1}`}
+                      className="w-full h-20 object-cover rounded-lg border border-slate-700"
+                    />
                     <button
-                      onClick={() => {
-                        const newImages = images.filter((_, i) => i !== index);
-                        setImages(newImages);
-                        if (editingTask) {
-                          updateTask(editingTask.id, { images: newImages });
-                        }
-                      }}
-                      className="absolute top-1 right-1 p-1 bg-red-600 hover:bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                      type="button"
+                      onClick={() => handleRemoveImage(index)}
+                      className="absolute top-1 right-1 p-1 bg-red-600 hover:bg-red-500
+                                 text-white rounded-full opacity-0 group-hover:opacity-100
+                                 transition-opacity"
                     >
-                      <Trash2 size={12} />
+                      <X size={12} />
                     </button>
                   </div>
                 ))}
