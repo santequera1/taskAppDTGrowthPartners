@@ -170,8 +170,8 @@ const App: React.FC = () => {
     setIsTaskModalOpen(true);
   };
 
-  const handleSaveTask = async (title: string, description: string, priority: Priority, status: TaskStatus, assignee: TeamMemberName, creator: TeamMemberName, projectId: string, startDate?: number, dueDate?: number, type?: TaskType, trackingPreset?: TrackingPreset) => {
-    const taskData: NewTask = { title, description, priority, status, assignee, creator, projectId, startDate, dueDate, type, trackingPreset };
+  const handleSaveTask = async (title: string, description: string, priority: Priority, status: TaskStatus, assignee: TeamMemberName, creator: TeamMemberName, projectId: string, startDate?: number, dueDate?: number, type?: TaskType, trackingPreset?: TrackingPreset, images?: string[]) => {
+    const taskData: NewTask = { title, description, priority, status, assignee, creator, projectId, startDate, dueDate, type, trackingPreset, images };
     
     if (editingTask) {
       const originalTasks = tasks;
