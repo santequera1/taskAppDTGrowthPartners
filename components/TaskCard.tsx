@@ -2,7 +2,7 @@ import React from 'react';
 import { Task, Priority, TEAM_MEMBERS, Project, TaskStatus, TRACKING_PRESETS } from '../types';
 import PomodoroTimer from './PomodoroTimer';
 import PomodoroHistory from './PomodoroHistory';
-import { GripVertical, Trash2, ArrowRight, Copy, Calendar, Clock, AlertCircle, Check } from 'lucide-react';
+import { GripVertical, Trash2, ArrowRight, Copy, Calendar, Clock, AlertCircle, Check, MessageCircle } from 'lucide-react';
 import { formatDate, formatRelativeDate, getDateBadgeColor, isOverdue } from '../utils/dateUtils';
 
 interface TaskCardProps {
@@ -12,13 +12,14 @@ interface TaskCardProps {
   onEdit: (task: Task) => void;
   onDuplicate: (task: Task) => void;
   onToggleComplete: (id: string, status: TaskStatus) => void;
+  onAddComment?: (taskId: string) => void;
   onOpenImageModal?: (imageSrc: string) => void;
   isMobile?: boolean;
   onPomodoroComplete?: (taskId: string, session: import('../types').PomodoroSession) => void;
   onPomodoroUpdate?: (taskId: string, state: { pomodoroStatus?: string; currentPomodoroTime?: number | null }) => void;
 }
 
-const TaskCard: React.FC<TaskCardProps> = ({ task, project, onDelete, onEdit, onDuplicate, onToggleComplete, onOpenImageModal, isMobile = false, onPomodoroComplete, onPomodoroUpdate }) => {
+const TaskCard: React.FC<TaskCardProps> = ({ task, project, onDelete, onEdit, onDuplicate, onToggleComplete, onAddComment, onOpenImageModal, isMobile = false, onPomodoroComplete, onPomodoroUpdate }) => {
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
     if (isMobile) {
@@ -192,7 +193,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, project, onDelete, onEdit, on
             <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white opacity-70 ${creator.color}`}>
               {creator.initials}
             </div>
-         
+
           </div>
           <ArrowRight size={12} className="text-slate-600" />
           <div className="flex items-center gap-2 bg-slate-800/80 pr-2 rounded-full">
@@ -202,11 +203,31 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, project, onDelete, onEdit, on
             {!isMobile && <span className="text-[10px] text-slate-300 leading-none">{assignee.name}</span>}
           </div>
         </div>
-        {!isMobile && (
-          <div className="flex items-center gap-1 text-slate-600" title="Arrastrar">
-            <GripVertical size={14} />
-          </div>
-        )}
+        <div className="flex items-center gap-1">
+          {onAddComment && (
+            <button
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                onAddComment(task.id);
+              }}
+              className="text-slate-500 hover:text-blue-400 hover:bg-slate-700/80 bg-slate-800/50 p-1.5 rounded-lg transition-colors relative"
+              title="Agregar comentario"
+            >
+              <MessageCircle size={isMobile ? 12 : 14} />
+              {(task.comments?.length || 0) > 0 && (
+                <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-[8px] rounded-full w-3 h-3 flex items-center justify-center">
+                  {task.comments!.length}
+                </span>
+              )}
+            </button>
+          )}
+          {!isMobile && (
+            <div className="text-slate-600" title="Arrastrar">
+              <GripVertical size={14} />
+            </div>
+          )}
+        </div>
       </div>
 
     </div>

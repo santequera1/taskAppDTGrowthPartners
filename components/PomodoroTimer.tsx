@@ -6,7 +6,7 @@ import { PomodoroSession } from '../types';
 
 interface PomodoroTimerProps {
   taskId: string;
-  initialTimeMs?: number; // ms remaining
+  initialTimeMs?: number; // ms elapsed
   initialStatus?: 'idle' | 'running' | 'paused' | 'break';
   workDurationMs?: number; // ms for work (default 25min)
   onComplete?: (taskId: string, session: PomodoroSession) => void;
@@ -18,13 +18,13 @@ const DEFAULT_WORK_MS = 25 * 60 * 1000;
 
 const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ taskId, initialTimeMs, initialStatus = 'idle', workDurationMs = DEFAULT_WORK_MS, onComplete, onUpdate, compact = false }) => {
   const [status, setStatus] = useState(initialStatus);
-  const [timeLeftMs, setTimeLeftMs] = useState<number>(initialTimeMs ?? workDurationMs);
+  const [timeElapsedMs, setTimeElapsedMs] = useState<number>(initialTimeMs ?? 0);
   const intervalRef = useRef<number | null>(null);
 
   useEffect(() => {
     // keep props in sync if changed externally
     setStatus(initialStatus);
-    if (initialTimeMs !== undefined) setTimeLeftMs(initialTimeMs);
+    if (initialTimeMs !== undefined) setTimeElapsedMs(initialTimeMs);
   }, [initialStatus, initialTimeMs]);
 
   useEffect(() => {
@@ -32,15 +32,15 @@ const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ taskId, initialTimeMs, in
     if (status === 'running') {
       if (intervalRef.current) window.clearInterval(intervalRef.current);
       intervalRef.current = window.setInterval(() => {
-        setTimeLeftMs(prev => {
-          if (prev <= 1000) {
+        setTimeElapsedMs(prev => {
+          if (prev + 1000 >= workDurationMs) {
             // complete
             window.clearInterval(intervalRef.current!);
             intervalRef.current = null;
             handleComplete();
-            return 0;
+            return workDurationMs;
           }
-          return prev - 1000;
+          return prev + 1000;
         });
       }, 1000);
     }
@@ -52,17 +52,17 @@ const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ taskId, initialTimeMs, in
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status]);
+  }, [status, workDurationMs]);
 
   useEffect(() => {
     // notify parent of updates
-    if (onUpdate) onUpdate(taskId, { pomodoroStatus: status, currentPomodoroTime: timeLeftMs });
+    if (onUpdate) onUpdate(taskId, { pomodoroStatus: status, currentPomodoroTime: timeElapsedMs });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeLeftMs, status]);
+  }, [timeElapsedMs, status]);
 
   const handleStart = () => {
     setStatus('running');
-    if (onUpdate) onUpdate(taskId, { pomodoroStatus: 'running', currentPomodoroTime: timeLeftMs });
+    if (onUpdate) onUpdate(taskId, { pomodoroStatus: 'running', currentPomodoroTime: timeElapsedMs });
   };
 
   const handlePause = () => {
@@ -71,7 +71,7 @@ const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ taskId, initialTimeMs, in
       window.clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
-    if (onUpdate) onUpdate(taskId, { pomodoroStatus: 'paused', currentPomodoroTime: timeLeftMs });
+    if (onUpdate) onUpdate(taskId, { pomodoroStatus: 'paused', currentPomodoroTime: timeElapsedMs });
   };
 
   // Reset is available internally (used by complete) but not exposed as a button by default.
@@ -81,7 +81,7 @@ const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ taskId, initialTimeMs, in
       window.clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
-    setTimeLeftMs(workDurationMs);
+    setTimeElapsedMs(0);
     if (onUpdate) onUpdate(taskId, { pomodoroStatus: 'idle', currentPomodoroTime: null });
   };
 
@@ -114,12 +114,12 @@ const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ taskId, initialTimeMs, in
     if (onComplete) onComplete(taskId, session);
   };
 
-  const secondsLeft = Math.ceil(timeLeftMs / 1000);
+  const secondsElapsed = Math.ceil(timeElapsedMs / 1000);
 
   if (compact) {
     return (
       <div className={`pomodoro-timer flex items-center gap-2 p-0 rounded-md ${status === 'running' ? 'running' : ''}`} onClick={(e) => e.stopPropagation()}>
-        <div className="text-sm font-mono tabular-nums text-white leading-none w-16 text-right"> <span className="ml-1">{formatSeconds(secondsLeft)}</span></div>
+        <div className="text-sm font-mono tabular-nums text-white leading-none w-16 text-right"> <span className="ml-1">{formatSeconds(secondsElapsed)}</span></div>
         <PomodoroControls isRunning={status === 'running'} onToggle={handleToggle} />
       </div>
     );
@@ -127,7 +127,7 @@ const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ taskId, initialTimeMs, in
 
   return (
     <div className={`pomodoro-timer flex items-center gap-3 p-2 rounded-md ${status === 'running' ? 'running' : ''}`} onClick={(e) => e.stopPropagation()}>
-      <div className="text-sm font-mono tabular-nums text-white leading-none w-16 text-center">{formatSeconds(secondsLeft)}</div>
+      <div className="text-sm font-mono tabular-nums text-white leading-none w-16 text-center">{formatSeconds(secondsElapsed)}</div>
       <PomodoroControls isRunning={status === 'running'} onToggle={handleToggle} />
     </div>
   );

@@ -13,6 +13,7 @@ interface ColumnProps {
   onEditTask: (task: Task) => void;
   onDuplicateTask: (task: Task) => void;
   onToggleComplete: (id: string, status: TaskStatus) => void;
+  onAddComment?: (taskId: string) => void;
   onOpenImageModal?: (imageSrc: string) => void;
   icon: React.ReactNode;
   colorClass: string;
@@ -31,6 +32,7 @@ const Column: React.FC<ColumnProps> = ({
   onEditTask,
   onDuplicateTask,
   onToggleComplete,
+  onAddComment,
   onOpenImageModal,
   icon,
   colorClass,
@@ -110,6 +112,7 @@ const Column: React.FC<ColumnProps> = ({
               onEdit={onEditTask}
               onDuplicate={onDuplicateTask}
               onToggleComplete={onToggleComplete}
+              onAddComment={onAddComment}
               onOpenImageModal={onOpenImageModal}
               project={(task as any).project}
               isMobile={isMobile}

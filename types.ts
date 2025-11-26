@@ -70,13 +70,20 @@ export const DEFAULT_PROJECTS: Project[] = [
   { id: 'p3', name: 'Interno', color: 'bg-slate-500' },
 ];
 
+export interface TaskComment {
+  id: string;
+  text: string;
+  author: TeamMemberName;
+  createdAt: number;
+}
+
 export interface Task {
   id: string;
   title: string;
   description: string;
   status: TaskStatus;
   priority: Priority;
-  assignee: TeamMemberName; 
+  assignee: TeamMemberName;
   creator: TeamMemberName;
   projectId: string; // New field linking task to a project
   type?: TaskType;
@@ -85,10 +92,11 @@ export interface Task {
   startDate?: number;
   dueDate?: number;
   images?: string[];  // Array de Base64 strings
+  comments?: TaskComment[];  // Array of comments
   // Pomodoro fields
   pomodoroSessions?: PomodoroSession[];
   totalPomodoros?: number;
-  currentPomodoroTime?: number; // ms remaining when running/paused
+  currentPomodoroTime?: number; // ms elapsed when running/paused
   pomodoroStatus?: 'idle' | 'running' | 'paused' | 'break';
 }
 

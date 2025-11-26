@@ -1,10 +1,11 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { Task, TaskStatus, Priority, TeamMemberName, Project, NewTask, NewProject, TaskType, TrackingPreset, TEAM_MEMBERS } from './types';
+import { Task, TaskStatus, Priority, TeamMemberName, Project, NewTask, NewProject, TaskType, TrackingPreset, TaskComment, TEAM_MEMBERS } from './types';
 import * as firestoreService from './lib/firestoreService';
 import { requestNotificationPermission } from './utils/pomodoroSound';
 import Column from './components/Column';
 import NewTaskModal from './components/NewTaskModal';
 import NewProjectModal from './components/NewProjectModal';
+import CommentsModal from './components/CommentsModal';
 import ConfirmModal from './components/ConfirmModal';
 import ErrorModal from './components/ErrorModal';
 import ImageModal from './components/ImageModal';
@@ -14,6 +15,7 @@ import MobileHeader from './components/MobileHeader';
 import MobileBottomNav from './components/MobileBottomNav';
 import MobileSidebar from './components/MobileSidebar';
 import { isOverdue } from './utils/dateUtils';
+import { generateId } from './utils/pomodoroHelpers';
 import { CheckCircle2, Circle, Clock, Plus, Loader } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -49,6 +51,9 @@ const App: React.FC = () => {
   const [mobileActiveColumn, setMobileActiveColumn] = useState<TaskStatus>(TaskStatus.TODO);
   const [imageModalOpen, setImageModalOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string>('');
+  const [commentsModalOpen, setCommentsModalOpen] = useState(false);
+  const [selectedTaskForComments, setSelectedTaskForComments] = useState<Task | null>(null);
+  const [currentCommentingUser, setCurrentCommentingUser] = useState<TeamMemberName>('Stiven');
 
   // --- DATA FETCHING ---
   useEffect(() => {
@@ -107,6 +112,42 @@ const App: React.FC = () => {
       await firestoreService.updateTaskPomodoroState(taskId, state);
     } catch (err) {
       console.error('updateTaskPomodoroState error', err);
+    }
+  };
+
+  const handleAddComment = (taskId: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (task) {
+      setSelectedTaskForComments(task);
+      setCommentsModalOpen(true);
+    }
+  };
+
+  const handleSaveComment = async (taskId: string, commentData: { text: string; author: TeamMemberName; createdAt: number }) => {
+    const originalTasks = tasks;
+    const newComment: TaskComment = {
+      id: generateId(),
+      ...commentData
+    };
+
+    const taskToUpdate = tasks.find(t => t.id === taskId);
+    if (!taskToUpdate) return;
+
+    const updatedComments: TaskComment[] = [...(taskToUpdate.comments || []), newComment];
+    const updatedTask: Task = {
+      ...taskToUpdate,
+      comments: updatedComments
+    };
+
+    setTasks(prev => prev.map(t => t.id === taskId ? updatedTask : t));
+
+    try {
+      await firestoreService.updateTask(taskId, { comments: updatedComments });
+      setSelectedTaskForComments(updatedTask);
+    } catch (err) {
+      console.error('Error saving comment:', err);
+      setError('Error al guardar el comentario.');
+      setTasks(originalTasks);
     }
   };
 
@@ -443,9 +484,9 @@ const App: React.FC = () => {
         </header>
         <main className="flex-1 overflow-x-auto overflow-y-hidden p-4">
             <div className="flex h-full gap-6 min-w-[1000px] mx-auto max-w-7xl">
-                <Column title="Tarea" status={TaskStatus.TODO} tasks={todoTasks} onDropTask={handleDropTask} onDeleteTask={handleDeleteTask} onAddTask={openNewTaskModal} onEditTask={openEditTaskModal} onDuplicateTask={openDuplicateTaskModal} onToggleComplete={handleToggleComplete} onOpenImageModal={openImageModal} icon={<Circle size={20} />} colorClass="text-blue-400" onPomodoroComplete={handlePomodoroComplete} onPomodoroUpdate={handlePomodoroUpdate} />
-                <Column title="En curso" status={TaskStatus.IN_PROGRESS} tasks={inProgressTasks} onDropTask={handleDropTask} onDeleteTask={handleDeleteTask} onAddTask={openNewTaskModal} onEditTask={openEditTaskModal} onDuplicateTask={openDuplicateTaskModal} onToggleComplete={handleToggleComplete} onOpenImageModal={openImageModal} icon={<Clock size={20} />} colorClass="text-amber-400" onPomodoroComplete={handlePomodoroComplete} onPomodoroUpdate={handlePomodoroUpdate} />
-                <Column title="Terminada" status={TaskStatus.DONE} tasks={doneTasks} onDropTask={handleDropTask} onDeleteTask={handleDeleteTask} onAddTask={openNewTaskModal} onEditTask={openEditTaskModal} onDuplicateTask={openDuplicateTaskModal} onToggleComplete={handleToggleComplete} onOpenImageModal={openImageModal} icon={<CheckCircle2 size={20} />} colorClass="text-emerald-400" onPomodoroComplete={handlePomodoroComplete} onPomodoroUpdate={handlePomodoroUpdate} />
+                <Column title="Tarea" status={TaskStatus.TODO} tasks={todoTasks} onDropTask={handleDropTask} onDeleteTask={handleDeleteTask} onAddTask={openNewTaskModal} onEditTask={openEditTaskModal} onDuplicateTask={openDuplicateTaskModal} onToggleComplete={handleToggleComplete} onAddComment={handleAddComment} onOpenImageModal={openImageModal} icon={<Circle size={20} />} colorClass="text-blue-400" onPomodoroComplete={handlePomodoroComplete} onPomodoroUpdate={handlePomodoroUpdate} />
+                <Column title="En curso" status={TaskStatus.IN_PROGRESS} tasks={inProgressTasks} onDropTask={handleDropTask} onDeleteTask={handleDeleteTask} onAddTask={openNewTaskModal} onEditTask={openEditTaskModal} onDuplicateTask={openDuplicateTaskModal} onToggleComplete={handleToggleComplete} onAddComment={handleAddComment} onOpenImageModal={openImageModal} icon={<Clock size={20} />} colorClass="text-amber-400" onPomodoroComplete={handlePomodoroComplete} onPomodoroUpdate={handlePomodoroUpdate} />
+                <Column title="Terminada" status={TaskStatus.DONE} tasks={doneTasks} onDropTask={handleDropTask} onDeleteTask={handleDeleteTask} onAddTask={openNewTaskModal} onEditTask={openEditTaskModal} onDuplicateTask={openDuplicateTaskModal} onToggleComplete={handleToggleComplete} onAddComment={handleAddComment} onOpenImageModal={openImageModal} icon={<CheckCircle2 size={20} />} colorClass="text-emerald-400" onPomodoroComplete={handlePomodoroComplete} onPomodoroUpdate={handlePomodoroUpdate} />
             </div>
         </main>
       </div>
@@ -465,13 +506,13 @@ const App: React.FC = () => {
             <MobileHeader projects={projects} activeProjectId={activeProjectId} onSelectProject={setActiveProjectId} onOpenSidebar={() => setIsMobileSidebarOpen(true)} onNewTask={() => openNewTaskModal(mobileActiveColumn)} dateFilter={dateFilter} onDateFilterChange={setDateFilter} counts={{ overdue: counts.overdue, today: counts.today, week: counts.week, total: counts.total, filtered: counts.filtered }} activeAssignee={selectedMember} />
             <main className="flex-1 overflow-y-auto p-4 pb-20 w-full">
                 {mobileActiveColumn === TaskStatus.TODO && (
-                  <Column title={activeColumnData.title} status={mobileActiveColumn} tasks={activeColumnData.tasks} onDropTask={handleDropTask} onDeleteTask={handleDeleteTask} onAddTask={openNewTaskModal} onEditTask={openEditTaskModal} onDuplicateTask={openDuplicateTaskModal} onToggleComplete={handleToggleComplete} onOpenImageModal={openImageModal} icon={React.createElement(activeColumnData.icon, { size: 20 })} colorClass={activeColumnData.color} isMobile onPomodoroComplete={handlePomodoroComplete} onPomodoroUpdate={handlePomodoroUpdate} />
+                  <Column title={activeColumnData.title} status={mobileActiveColumn} tasks={activeColumnData.tasks} onDropTask={handleDropTask} onDeleteTask={handleDeleteTask} onAddTask={openNewTaskModal} onEditTask={openEditTaskModal} onDuplicateTask={openDuplicateTaskModal} onToggleComplete={handleToggleComplete} onAddComment={handleAddComment} onOpenImageModal={openImageModal} icon={React.createElement(activeColumnData.icon, { size: 20 })} colorClass={activeColumnData.color} isMobile onPomodoroComplete={handlePomodoroComplete} onPomodoroUpdate={handlePomodoroUpdate} />
                 )}
                 {mobileActiveColumn === TaskStatus.IN_PROGRESS && (
-                  <Column title={activeColumnData.title} status={mobileActiveColumn} tasks={activeColumnData.tasks} onDropTask={handleDropTask} onDeleteTask={handleDeleteTask} onAddTask={openNewTaskModal} onEditTask={openEditTaskModal} onDuplicateTask={openDuplicateTaskModal} onToggleComplete={handleToggleComplete} onOpenImageModal={openImageModal} icon={React.createElement(activeColumnData.icon, { size: 20 })} colorClass={activeColumnData.color} isMobile onPomodoroComplete={handlePomodoroComplete} onPomodoroUpdate={handlePomodoroUpdate} />
+                  <Column title={activeColumnData.title} status={mobileActiveColumn} tasks={activeColumnData.tasks} onDropTask={handleDropTask} onDeleteTask={handleDeleteTask} onAddTask={openNewTaskModal} onEditTask={openEditTaskModal} onDuplicateTask={openDuplicateTaskModal} onToggleComplete={handleToggleComplete} onAddComment={handleAddComment} onOpenImageModal={openImageModal} icon={React.createElement(activeColumnData.icon, { size: 20 })} colorClass={activeColumnData.color} isMobile onPomodoroComplete={handlePomodoroComplete} onPomodoroUpdate={handlePomodoroUpdate} />
                 )}
                 {mobileActiveColumn === TaskStatus.DONE && (
-                  <Column title={activeColumnData.title} status={mobileActiveColumn} tasks={activeColumnData.tasks} onDropTask={handleDropTask} onDeleteTask={handleDeleteTask} onAddTask={openNewTaskModal} onEditTask={openEditTaskModal} onDuplicateTask={openDuplicateTaskModal} onToggleComplete={handleToggleComplete} onOpenImageModal={openImageModal} icon={React.createElement(activeColumnData.icon, { size: 20 })} colorClass={activeColumnData.color} isMobile onPomodoroComplete={handlePomodoroComplete} onPomodoroUpdate={handlePomodoroUpdate} />
+                  <Column title={activeColumnData.title} status={mobileActiveColumn} tasks={activeColumnData.tasks} onDropTask={handleDropTask} onDeleteTask={handleDeleteTask} onAddTask={openNewTaskModal} onEditTask={openEditTaskModal} onDuplicateTask={openDuplicateTaskModal} onToggleComplete={handleToggleComplete} onAddComment={handleAddComment} onOpenImageModal={openImageModal} icon={React.createElement(activeColumnData.icon, { size: 20 })} colorClass={activeColumnData.color} isMobile onPomodoroComplete={handlePomodoroComplete} onPomodoroUpdate={handlePomodoroUpdate} />
                 )}
                 
             </main>
@@ -486,6 +527,7 @@ const App: React.FC = () => {
       {isMobile ? renderMobileView() : renderDesktopView()}
       <NewTaskModal isOpen={isTaskModalOpen} onClose={() => { setIsTaskModalOpen(false); setEditingTask(null); setDuplicatingTask(null); }} onSave={handleSaveTask} onTaskUpdate={handleTaskUpdate} initialStatus={modalDefaultStatus} projects={projects} activeProjectId={activeProjectId} taskToEdit={editingTask} taskToDuplicate={duplicatingTask} />
       <NewProjectModal isOpen={isProjectModalOpen} onClose={() => { setIsProjectModalOpen(false); setEditingProject(null); }} onSave={handleProjectSave} onDelete={initiateDeleteProject} projectToEdit={editingProject} />
+      <CommentsModal isOpen={commentsModalOpen} onClose={() => { setCommentsModalOpen(false); setSelectedTaskForComments(null); }} task={selectedTaskForComments!} onSaveComment={handleSaveComment} currentUser={currentCommentingUser} onCurrentUserChange={setCurrentCommentingUser} />
       <ConfirmModal isOpen={!!projectToDelete} onClose={() => setProjectToDelete(null)} onConfirm={confirmDeleteProject} title="Eliminar Proyecto" message="¿Estás seguro de que deseas eliminar este proyecto? Esta acción eliminará permanentemente todas las tareas asociadas y no se puede deshacer." />
       <ErrorModal isOpen={!!error} message={error} onClose={() => setError(null)} />
       <ImageModal isOpen={imageModalOpen} onClose={() => { setImageModalOpen(false); setSelectedImage(''); }} imageSrc={selectedImage} alt="Imagen de tarea" />
