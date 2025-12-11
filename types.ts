@@ -41,7 +41,7 @@ export const TRACKING_PRESETS: { id: TrackingPreset; label: string; minutes: num
   { id: 'LONG_BREAK', label: 'Pausa larga', minutes: 15 },
 ];
 
-export type TeamMemberName = 'Dairo' | 'Stiven' | 'Mariana' | 'Jose' | 'Anderson';
+export type TeamMemberName = 'Dairo' | 'Stiven' | 'Mariana' | 'Jose' | 'Anderson' | 'Edgardo';
 
 export interface TeamMember {
   name: TeamMemberName;
@@ -56,12 +56,14 @@ export const TEAM_MEMBERS: TeamMember[] = [
   { name: 'Mariana', role: 'Designer', initials: 'MA', color: 'bg-pink-500' },
   { name: 'Jose', role: 'Freelancer', initials: 'JO', color: 'bg-orange-500' },
   { name: 'Anderson', role: 'Freelancer', initials: 'AN', color: 'bg-teal-500' },
+  { name: 'Edgardo', role: 'Dev', initials: 'EM', color: 'bg-blue-500' },
 ];
 
 export interface Project {
   id: string;
   name: string;
   color: string; // Tailwind color class for the badge (e.g., 'bg-indigo-500')
+  order?: number; // Order for sorting projects
 }
 
 export const DEFAULT_PROJECTS: Project[] = [
@@ -91,6 +93,8 @@ export interface Task {
   createdAt: number;
   startDate?: number;
   dueDate?: number;
+  completedAt?: number; // When task was marked as completed
+  originalId?: string; // Original ID when task was in active tasks (for restored tasks)
   images?: string[];  // Array de Base64 strings
   comments?: TaskComment[];  // Array of comments
   // Pomodoro fields
@@ -98,6 +102,7 @@ export interface Task {
   totalPomodoros?: number;
   currentPomodoroTime?: number; // ms elapsed when running/paused
   pomodoroStatus?: 'idle' | 'running' | 'paused' | 'break';
+  deletedAt?: number; // When task was deleted
 }
 
 // Pomodoro session record
