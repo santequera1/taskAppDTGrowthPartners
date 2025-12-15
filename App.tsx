@@ -1,21 +1,9 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-
-// Custom hook for viewport width
-const useViewportWidth = () => {
-  const [width, setWidth] = useState(window.innerWidth);
-
-  useEffect(() => {
-    const handleResize = () => setWidth(window.innerWidth);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  return width;
-};
-import { Task, TaskStatus, Priority, TeamMemberName, Project, NewTask, NewProject, TaskType, TrackingPreset, TaskComment, TEAM_MEMBERS } from './types';
+import { Task, TaskStatus, Priority, TeamMemberName, Project, NewTask, NewProject, TaskType, TrackingPreset, TaskComment, TEAM_MEMBERS, BoardColumn, DEFAULT_COLUMNS } from './types';
 import * as firestoreService from './lib/firestoreService';
+import { requestNotificationPermission } from './utils/pomodoroSound';
+import { useLayoutFix } from './utils/useLayoutFix';
 import Column from './components/Column';
-import UnifiedTaskList from './components/UnifiedTaskList';
 import NewTaskModal from './components/NewTaskModal';
 import NewProjectModal from './components/NewProjectModal';
 import CommentsModal from './components/CommentsModal';
@@ -23,12 +11,14 @@ import ConfirmModal from './components/ConfirmModal';
 import ErrorModal from './components/ErrorModal';
 import ImageModal from './components/ImageModal';
 import Sidebar from './components/Sidebar';
-import CompletedTasksView from './components/CompletedTasksView';
-import DeletedTasksView from './components/DeletedTasksView';
 import DateFilter, { DateFilterType } from './components/DateFilter';
 import MobileHeader from './components/MobileHeader';
 import MobileBottomNav from './components/MobileBottomNav';
 import MobileSidebar from './components/MobileSidebar';
+import UnifiedTaskList from './components/UnifiedTaskList';
+import NewColumnModal from './components/NewColumnModal';
+import CompletedTasksView from './components/CompletedTasksView';
+import DeletedTasksView from './components/DeletedTasksView';
 import { isOverdue } from './utils/dateUtils';
 import { generateId } from './utils/pomodoroHelpers';
 import { CheckCircle2, Circle, Clock, Plus, Loader, List, Grid3X3 } from 'lucide-react';
@@ -36,7 +26,6 @@ import { CheckCircle2, Circle, Clock, Plus, Loader, List, Grid3X3 } from 'lucide
 const App: React.FC = () => {
   // --- RESPONSIVE STATE ---
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const viewportWidth = useViewportWidth();
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -57,10 +46,6 @@ const App: React.FC = () => {
   const [dateFilter, setDateFilter] = useState<DateFilterType>('all');
   const [selectedMember, setSelectedMember] = useState<TeamMemberName | null>(null);
   const [showCompleted, setShowCompleted] = useState(false);
-  const [viewMode, setViewMode] = useState<'card' | 'list' | 'compact' | 'unified'>(() => {
-    const saved = localStorage.getItem('taskViewMode');
-    return (saved as 'card' | 'list' | 'compact' | 'unified') || 'card';
-  });
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     const saved = localStorage.getItem('sidebarCollapsed');
     return saved === 'true';
@@ -68,17 +53,27 @@ const App: React.FC = () => {
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
+  const [isColumnModalOpen, setIsColumnModalOpen] = useState(false);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
-  const [modalDefaultStatus, setModalDefaultStatus] = useState<TaskStatus>(TaskStatus.TODO);
+  const [modalDefaultStatus, setModalDefaultStatus] = useState<string>(TaskStatus.TODO);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [duplicatingTask, setDuplicatingTask] = useState<Task | null>(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const [mobileActiveColumn, setMobileActiveColumn] = useState<TaskStatus>(TaskStatus.TODO);
+  const [mobileActiveColumn, setMobileActiveColumn] = useState<string>(TaskStatus.TODO);
   const [imageModalOpen, setImageModalOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string>('');
   const [commentsModalOpen, setCommentsModalOpen] = useState(false);
   const [selectedTaskForComments, setSelectedTaskForComments] = useState<Task | null>(null);
   const [currentCommentingUser, setCurrentCommentingUser] = useState<TeamMemberName>('Stiven');
+
+  // View Mode
+  const [viewMode, setViewMode] = useState<'card' | 'list' | 'compact' | 'unified'>('card');
+
+  // Columns
+  const [columns, setColumns] = useState<BoardColumn[]>(DEFAULT_COLUMNS);
+
+  // Layout fix hook
+  const { refreshLayout } = useLayoutFix(isMobile, isSidebarCollapsed);
 
   // Completed Tasks History
   const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
@@ -90,19 +85,23 @@ const App: React.FC = () => {
   const [isDeletedTasksViewOpen, setIsDeletedTasksViewOpen] = useState(false);
   const [isLoadingDeletedTasks, setIsLoadingDeletedTasks] = useState(false);
 
+  // Helper functions for column/status mapping
+
+  // Tasks already have status
+
   // --- DATA FETCHING ---
   useEffect(() => {
     const fetchData = async () => {
       try {
         setIsLoading(true);
-        const [loadedTasks, loadedProjects, loadedDeletedTasks] = await Promise.all([
+        const [loadedTasks, loadedProjects, loadedColumns] = await Promise.all([
           firestoreService.loadTasks(),
           firestoreService.loadProjects(),
-          firestoreService.loadDeletedTasks(),
+          firestoreService.loadColumns(),
         ]);
         setTasks(loadedTasks);
         setProjects(loadedProjects);
-        setDeletedTasks(loadedDeletedTasks);
+        setColumns([...DEFAULT_COLUMNS, ...loadedColumns]);
         setError(null);
       } catch (err) {
         setError('Error al cargar datos desde Firebase.');
@@ -162,10 +161,6 @@ const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleEsc);
   }, [imageModalOpen]);
 
-  // Save view mode to localStorage
-  useEffect(() => {
-    localStorage.setItem('taskViewMode', viewMode);
-  }, [viewMode]);
 
   // Save sidebar collapsed state to localStorage
   useEffect(() => {
@@ -231,12 +226,12 @@ const App: React.FC = () => {
   };
 
   // --- HANDLERS ---
-  const handleDropTask = useCallback(async (taskId: string, newStatus: TaskStatus) => {
+  const handleDropTask = useCallback(async (taskId: string, newStatus: string) => {
     const originalTasks = tasks;
     const updatedTasks = tasks.map(task => task.id === taskId ? { ...task, status: newStatus } : task);
     setTasks(updatedTasks);
     try {
-      await firestoreService.updateTask(taskId, { status: newStatus });
+      await firestoreService.updateTask(taskId, { status: newStatus as TaskStatus });
     } catch (err) {
       console.error('updateTask (status) error', err);
       setError('Error al actualizar el estado de la tarea.');
@@ -244,7 +239,7 @@ const App: React.FC = () => {
     }
   }, [tasks]);
 
-  const handleToggleComplete = useCallback(async (taskId: string, newStatus: TaskStatus) => {
+  const handleToggleComplete = useCallback(async (taskId: string, newStatus: string) => {
     const originalTasks = tasks;
     const taskToUpdate = tasks.find(task => task.id === taskId);
     if (!taskToUpdate) return;
@@ -253,14 +248,14 @@ const App: React.FC = () => {
     if (newStatus === TaskStatus.DONE) {
       try {
         // Update task status in main collection
-        const updatedTasks = tasks.map(task => task.id === taskId ? { ...task, status: newStatus } : task);
+        const updatedTasks = tasks.map(task => task.id === taskId ? { ...task, status: newStatus as TaskStatus } : task);
         setTasks(updatedTasks);
 
         // Copy task to completed collection (don't delete from main collection)
         await firestoreService.copyTaskToCompleted(taskId, taskToUpdate);
 
         // Update task status in Firestore
-        await firestoreService.updateTask(taskId, { status: newStatus });
+        await firestoreService.updateTask(taskId, { status: newStatus as TaskStatus });
       } catch (err) {
         console.error('Error completing task:', err);
         setError('Error al completar la tarea.');
@@ -270,9 +265,9 @@ const App: React.FC = () => {
     // If restoring from DONE to another status
     else if (taskToUpdate.status === TaskStatus.DONE) {
       try {
-        const updatedTasks = tasks.map(task => task.id === taskId ? { ...task, status: newStatus } : task);
+        const updatedTasks = tasks.map(task => task.id === taskId ? { ...task, status: newStatus as TaskStatus } : task);
         setTasks(updatedTasks);
-        await firestoreService.updateTask(taskId, { status: newStatus });
+        await firestoreService.updateTask(taskId, { status: newStatus as TaskStatus });
       } catch (err) {
         console.error('updateTask (status) error', err);
         setError('Error al actualizar el estado de la tarea.');
@@ -281,10 +276,10 @@ const App: React.FC = () => {
     }
     // Normal status change (not involving DONE)
     else {
-      const updatedTasks = tasks.map(task => task.id === taskId ? { ...task, status: newStatus } : task);
+      const updatedTasks = tasks.map(task => task.id === taskId ? { ...task, status: newStatus as TaskStatus } : task);
       setTasks(updatedTasks);
       try {
-        await firestoreService.updateTask(taskId, { status: newStatus });
+        await firestoreService.updateTask(taskId, { status: newStatus as TaskStatus });
       } catch (err) {
         console.error('updateTask (status) error', err);
         setError('Error al actualizar el estado de la tarea.');
@@ -388,7 +383,7 @@ const App: React.FC = () => {
     }
   };
 
-  const openNewTaskModal = (status: TaskStatus = TaskStatus.TODO) => {
+  const openNewTaskModal = (status: string = TaskStatus.TODO) => {
     setModalDefaultStatus(status);
     setEditingTask(null);
     setDuplicatingTask(null);
@@ -409,8 +404,8 @@ const App: React.FC = () => {
     setIsTaskModalOpen(true);
   };
 
-  const handleSaveTask = async (title: string, description: string, priority: Priority, status: TaskStatus, assignee: TeamMemberName, creator: TeamMemberName, projectId: string, startDate?: number, dueDate?: number, type?: TaskType, trackingPreset?: TrackingPreset, images?: string[]) => {
-    const taskData: NewTask = { title, description, priority, status, assignee, creator, projectId, startDate, dueDate, type, trackingPreset, images };
+  const handleSaveTask = async (title: string, description: string, priority: Priority, status: string, assignee: TeamMemberName, creator: TeamMemberName, projectId: string, startDate?: number, dueDate?: number, type?: TaskType, trackingPreset?: TrackingPreset, images?: string[]) => {
+    const taskData: NewTask = { title, description, priority, status: status as TaskStatus, assignee, creator, projectId, startDate, dueDate, type, trackingPreset, images };
     
     if (editingTask) {
       const originalTasks = tasks;
@@ -476,6 +471,48 @@ const App: React.FC = () => {
     setEditingProject(null);
   };
 
+  const handleColumnSave = async (name: string, color: string, icon: string) => {
+    setIsColumnModalOpen(false);
+    try {
+      const columnDataWithTime = { name, color, icon, order: columns.length, isDefault: false, status: name, createdAt: Date.now() };
+      const newId = await firestoreService.createColumn(columnDataWithTime);
+      const newColumn = { ...columnDataWithTime, id: newId };
+      setColumns(prev => [...prev, newColumn]);
+      
+      // Refresh layout after adding column to maintain proper header width
+      setTimeout(() => refreshLayout(), 100);
+    } catch (err) {
+      console.error('createColumn error', err);
+      setError('Error al crear la columna.');
+    }
+  };
+
+  const handleDeleteColumn = async (columnId: string) => {
+    const columnToDelete = columns.find(c => c.id === columnId);
+    if (!columnToDelete) return;
+
+    // Move tasks in this column to TODO
+    const tasksToMove = tasks.filter(t => t.status === columnToDelete.status);
+    const updatePromises = tasksToMove.map(task =>
+      firestoreService.updateTask(task.id, { status: TaskStatus.TODO })
+    );
+
+    try {
+      await Promise.all(updatePromises);
+      setTasks(prev => prev.map(t => t.status === columnToDelete.status ? { ...t, status: TaskStatus.TODO } : t));
+
+      // Delete the column
+      await firestoreService.deleteColumn(columnId);
+      setColumns(prev => prev.filter(c => c.id !== columnId));
+      
+      // Refresh layout after deleting column to maintain proper header width
+      setTimeout(() => refreshLayout(), 100);
+    } catch (err) {
+      console.error('deleteColumn error', err);
+      setError('Error al eliminar la columna.');
+    }
+  };
+
   const openAddProjectModal = () => {
       setEditingProject(null);
       setIsProjectModalOpen(true);
@@ -526,7 +563,7 @@ const App: React.FC = () => {
   }, [activeProjectId, dateFilter, selectedMember, showCompleted]);
 
   // 1. Filtrar por proyecto
-  let filteredTasks = activeProjectId 
+  let filteredTasks = activeProjectId
     ? tasks.filter(t => t.projectId === activeProjectId)
     : tasks;
 
@@ -540,7 +577,7 @@ const App: React.FC = () => {
 
   // 3. Filtrar por completadas
   if (showCompleted) {
-    filteredTasks = filteredTasks.filter(t => t.status === TaskStatus.DONE);
+    filteredTasks = filteredTasks.filter(t => t.status === 'DONE');
     console.log('3️⃣ Después de filtro completadas:', filteredTasks.length);
   }
 
@@ -557,7 +594,7 @@ const App: React.FC = () => {
 
     switch (dateFilter) {
       case 'overdue':
-        return isOverdue(task.dueDate) && task.status !== TaskStatus.DONE;
+        return isOverdue(task.dueDate) && task.status !== 'DONE';
       case 'today':
         return task.dueDate >= todayTimestamp && task.dueDate < tomorrowTimestamp;
       case 'week':
@@ -615,7 +652,7 @@ const App: React.FC = () => {
     endOfMonth.setHours(23, 59, 59, 999);
 
     return {
-      overdue: filteredTasks.filter(t => t.dueDate && isOverdue(t.dueDate) && t.status !== TaskStatus.DONE).length,
+      overdue: filteredTasks.filter(t => t.dueDate && isOverdue(t.dueDate) && t.status !== 'DONE').length,
       today: filteredTasks.filter(t => {
         if (!t.dueDate) return false;
         return t.dueDate >= todayStart && t.dueDate < tomorrowStart;
@@ -626,9 +663,9 @@ const App: React.FC = () => {
       }).length,
       total: filteredTasks.length,
       filtered: dateFilteredTasks.length,
-      [TaskStatus.TODO]: dateFilteredTasks.filter(t => t.status === TaskStatus.TODO).length,
-      [TaskStatus.IN_PROGRESS]: dateFilteredTasks.filter(t => t.status === TaskStatus.IN_PROGRESS).length,
-      [TaskStatus.DONE]: dateFilteredTasks.filter(t => t.status === TaskStatus.DONE).length,
+      'TODO': dateFilteredTasks.filter(t => t.status === 'TODO').length,
+      'IN_PROGRESS': dateFilteredTasks.filter(t => t.status === 'IN_PROGRESS').length,
+      'DONE': dateFilteredTasks.filter(t => t.status === 'DONE').length,
     };
   }, [filteredTasks, dateFilteredTasks]);
   
@@ -640,9 +677,9 @@ const App: React.FC = () => {
   }, [tasks]);
 
   const tasksWithProjects = dateFilteredTasks.map(t => ({ ...t, project: projects.find(p => p.id === t.projectId) }));
-  const todoTasks = tasksWithProjects.filter(t => t.status === TaskStatus.TODO);
-  const inProgressTasks = tasksWithProjects.filter(t => t.status === TaskStatus.IN_PROGRESS);
-  const doneTasks = tasksWithProjects.filter(t => t.status === TaskStatus.DONE);
+  const todoTasks = tasksWithProjects.filter(t => t.status === 'TODO');
+  const inProgressTasks = tasksWithProjects.filter(t => t.status === 'IN_PROGRESS');
+  const doneTasks = tasksWithProjects.filter(t => t.status === 'DONE');
   
   const getHeaderTitle = () => {
     if (selectedMember) {
@@ -729,7 +766,7 @@ const App: React.FC = () => {
         </div>
 
         {/* Main content area with dynamic margin */}
-        <div className={`flex-1 flex flex-col min-h-screen transition-all duration-300 ease-in-out ${mainMarginLeft}`}>
+        <div className={`flex-1 flex flex-col min-h-screen max-w-full transition-all duration-300 ease-in-out ${mainMarginLeft}`}>
           <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-xl sticky top-0 z-20 p-4 space-y-3">
               <div className="flex items-center justify-between">
                   <div>
@@ -764,6 +801,7 @@ const App: React.FC = () => {
                           </span>
                       </button>
                       <button onClick={() => openNewTaskModal(TaskStatus.TODO)} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"><Plus size={18} /><span>Nueva Tarea</span></button>
+                      <button onClick={() => setIsColumnModalOpen(true)} className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"><Plus size={18} /><span>Nueva Columna</span></button>
                   </div>
               </div>
               <DateFilter activeFilter={dateFilter} onFilterChange={setDateFilter} overdueCount={counts.overdue} todayCount={counts.today} weekCount={counts.week} />
@@ -776,79 +814,44 @@ const App: React.FC = () => {
                   <UnifiedTaskList
                       tasks={tasks}
                       projects={projects}
+                      columns={columns}
                       onEditTask={openEditTaskModal}
                       onToggleComplete={handleToggleComplete}
                       onAddTask={() => openNewTaskModal(TaskStatus.TODO)}
                   />
               ) : (
-                  /* Kanban Board with Fluid Grid Layout */
-                  <div className="p-6 h-full overflow-hidden">
-                      <div className="h-full grid grid-cols-1 md:grid-cols-3 gap-6 auto-rows-fr">
-                          {/* Column 1: TODO */}
-                          <div className="min-w-0">
-                              <Column
-                                title="Tarea"
-                                status={TaskStatus.TODO}
-                                tasks={todoTasks}
-                                viewMode={viewMode}
-                                onDropTask={handleDropTask}
-                                onDeleteTask={handleDeleteTask}
-                                onAddTask={openNewTaskModal}
-                                onEditTask={openEditTaskModal}
-                                onDuplicateTask={openDuplicateTaskModal}
-                                onToggleComplete={handleToggleComplete}
-                                onAddComment={handleAddComment}
-                                onOpenImageModal={openImageModal}
-                                icon={<Circle size={20} />}
-                                colorClass="text-blue-400"
-                                onPomodoroComplete={handlePomodoroComplete}
-                                onPomodoroUpdate={handlePomodoroUpdate}
-                              />
-                          </div>
-
-                          {/* Column 2: IN PROGRESS */}
-                          <div className="min-w-0">
-                              <Column
-                                title="En curso"
-                                status={TaskStatus.IN_PROGRESS}
-                                tasks={inProgressTasks}
-                                viewMode={viewMode}
-                                onDropTask={handleDropTask}
-                                onDeleteTask={handleDeleteTask}
-                                onAddTask={openNewTaskModal}
-                                onEditTask={openEditTaskModal}
-                                onDuplicateTask={openDuplicateTaskModal}
-                                onToggleComplete={handleToggleComplete}
-                                onAddComment={handleAddComment}
-                                onOpenImageModal={openImageModal}
-                                icon={<Clock size={20} />}
-                                colorClass="text-amber-400"
-                                onPomodoroComplete={handlePomodoroComplete}
-                                onPomodoroUpdate={handlePomodoroUpdate}
-                              />
-                          </div>
-
-                          {/* Column 3: DONE */}
-                          <div className="min-w-0">
-                              <Column
-                                title="Terminada"
-                                status={TaskStatus.DONE}
-                                tasks={doneTasks}
-                                viewMode={viewMode}
-                                onDropTask={handleDropTask}
-                                onDeleteTask={handleDeleteTask}
-                                onAddTask={openNewTaskModal}
-                                onEditTask={openEditTaskModal}
-                                onDuplicateTask={openDuplicateTaskModal}
-                                onToggleComplete={handleToggleComplete}
-                                onAddComment={handleAddComment}
-                                onOpenImageModal={openImageModal}
-                                icon={<CheckCircle2 size={20} />}
-                                colorClass="text-emerald-400"
-                                onPomodoroComplete={handlePomodoroComplete}
-                                onPomodoroUpdate={handlePomodoroUpdate}
-                              />
-                          </div>
+                  /* Kanban Board with Horizontal Layout */
+                  <div className="p-6 h-full overflow-x-auto custom-scrollbar">
+                      <div className="min-w-full flex flex-row gap-6 flex-nowrap">
+                          {columns.map((column) => {
+                            const tasksForColumn = dateFilteredTasks.filter(t => t.status === column.status);
+                            const iconMap = { Circle, Clock, CheckCircle2, Star: () => <span>⭐</span>, Heart: () => <span>❤️</span>, Zap: () => <span>⚡</span>, Target: () => <span>🎯</span>, Flag: () => <span>🚩</span>, Bookmark: () => <span>📖</span>, Lightbulb: () => <span>💡</span> };
+                            const IconComponent = iconMap[column.icon as keyof typeof iconMap] || Circle;
+                          return (
+                              <div key={column.id} className="flex-shrink-0 w-[280px]" data-column="true">
+                                <Column
+                                  title={column.name}
+                                  status={column.status as TaskStatus}
+                                  tasks={tasksForColumn}
+                                  viewMode={viewMode}
+                                  onDropTask={handleDropTask}
+                                  onDeleteTask={handleDeleteTask}
+                                  onAddTask={openNewTaskModal}
+                                  onEditTask={openEditTaskModal}
+                                  onDuplicateTask={openDuplicateTaskModal}
+                                  onToggleComplete={handleToggleComplete}
+                                  onAddComment={handleAddComment}
+                                  onOpenImageModal={openImageModal}
+                                  icon={<IconComponent size={20} />}
+                                  colorClass={column.color}
+                                  onPomodoroComplete={handlePomodoroComplete}
+                                  onPomodoroUpdate={handlePomodoroUpdate}
+                                  isDefault={column.isDefault}
+                                  onDeleteColumn={() => handleDeleteColumn(column.id)}
+                                />
+                              </div>
+                            );
+                          })}
                       </div>
                   </div>
               )}
@@ -860,28 +863,28 @@ const App: React.FC = () => {
 
   const renderMobileView = () => {
     const columnMap = {
-        [TaskStatus.TODO]: { tasks: todoTasks, title: "Tareas", icon: Circle, color: "text-blue-400" },
-        [TaskStatus.IN_PROGRESS]: { tasks: inProgressTasks, title: "En Curso", icon: Clock, color: "text-amber-400" },
-        [TaskStatus.DONE]: { tasks: doneTasks, title: "Terminadas", icon: CheckCircle2, color: "text-emerald-400" },
+        'TODO': { tasks: todoTasks, title: "Tareas", icon: Circle, color: "text-blue-400" },
+        'IN_PROGRESS': { tasks: inProgressTasks, title: "En Curso", icon: Clock, color: "text-amber-400" },
+        'DONE': { tasks: doneTasks, title: "Terminadas", icon: CheckCircle2, color: "text-emerald-400" },
     };
     const activeColumnData = columnMap[mobileActiveColumn];
 
     return (
         <>
-            <MobileHeader projects={projects} activeProjectId={activeProjectId} onSelectProject={setActiveProjectId} onOpenSidebar={() => setIsMobileSidebarOpen(true)} onNewTask={() => openNewTaskModal(mobileActiveColumn)} dateFilter={dateFilter} onDateFilterChange={setDateFilter} counts={{ overdue: counts.overdue, today: counts.today, week: counts.week, total: counts.total, filtered: counts.filtered }} activeAssignee={selectedMember} />
+            <MobileHeader projects={projects} activeProjectId={activeProjectId} onSelectProject={setActiveProjectId} onOpenSidebar={() => setIsMobileSidebarOpen(true)} onNewTask={() => openNewTaskModal(mobileActiveColumn as TaskStatus)} dateFilter={dateFilter} onDateFilterChange={setDateFilter} counts={{ overdue: counts.overdue, today: counts.today, week: counts.week, total: counts.total, filtered: counts.filtered }} activeAssignee={selectedMember} />
             <main className="flex-1 overflow-y-auto p-4 pb-20 w-full">
-                {mobileActiveColumn === TaskStatus.TODO && (
-                  <Column title={activeColumnData.title} status={mobileActiveColumn} tasks={activeColumnData.tasks} viewMode={viewMode} onDropTask={handleDropTask} onDeleteTask={handleDeleteTask} onAddTask={openNewTaskModal} onEditTask={openEditTaskModal} onDuplicateTask={openDuplicateTaskModal} onToggleComplete={handleToggleComplete} onAddComment={handleAddComment} onOpenImageModal={openImageModal} icon={React.createElement(activeColumnData.icon, { size: 20 })} colorClass={activeColumnData.color} isMobile onPomodoroComplete={handlePomodoroComplete} onPomodoroUpdate={handlePomodoroUpdate} />
+                {mobileActiveColumn === 'TODO' && (
+                  <Column title={activeColumnData.title} status={mobileActiveColumn as TaskStatus} tasks={activeColumnData.tasks} viewMode={viewMode} onDropTask={handleDropTask} onDeleteTask={handleDeleteTask} onAddTask={openNewTaskModal} onEditTask={openEditTaskModal} onDuplicateTask={openDuplicateTaskModal} onToggleComplete={handleToggleComplete} onAddComment={handleAddComment} onOpenImageModal={openImageModal} icon={React.createElement(activeColumnData.icon, { size: 20 })} colorClass={activeColumnData.color} isMobile onPomodoroComplete={handlePomodoroComplete} onPomodoroUpdate={handlePomodoroUpdate} />
                 )}
-                {mobileActiveColumn === TaskStatus.IN_PROGRESS && (
-                  <Column title={activeColumnData.title} status={mobileActiveColumn} tasks={activeColumnData.tasks} viewMode={viewMode} onDropTask={handleDropTask} onDeleteTask={handleDeleteTask} onAddTask={openNewTaskModal} onEditTask={openEditTaskModal} onDuplicateTask={openDuplicateTaskModal} onToggleComplete={handleToggleComplete} onAddComment={handleAddComment} onOpenImageModal={openImageModal} icon={React.createElement(activeColumnData.icon, { size: 20 })} colorClass={activeColumnData.color} isMobile onPomodoroComplete={handlePomodoroComplete} onPomodoroUpdate={handlePomodoroUpdate} />
+                {mobileActiveColumn === 'IN_PROGRESS' && (
+                  <Column title={activeColumnData.title} status={mobileActiveColumn as TaskStatus} tasks={activeColumnData.tasks} viewMode={viewMode} onDropTask={handleDropTask} onDeleteTask={handleDeleteTask} onAddTask={openNewTaskModal} onEditTask={openEditTaskModal} onDuplicateTask={openDuplicateTaskModal} onToggleComplete={handleToggleComplete} onAddComment={handleAddComment} onOpenImageModal={openImageModal} icon={React.createElement(activeColumnData.icon, { size: 20 })} colorClass={activeColumnData.color} isMobile onPomodoroComplete={handlePomodoroComplete} onPomodoroUpdate={handlePomodoroUpdate} />
                 )}
-                {mobileActiveColumn === TaskStatus.DONE && (
-                  <Column title={activeColumnData.title} status={mobileActiveColumn} tasks={activeColumnData.tasks} viewMode={viewMode} onDropTask={handleDropTask} onDeleteTask={handleDeleteTask} onAddTask={openNewTaskModal} onEditTask={openEditTaskModal} onDuplicateTask={openDuplicateTaskModal} onToggleComplete={handleToggleComplete} onAddComment={handleAddComment} onOpenImageModal={openImageModal} icon={React.createElement(activeColumnData.icon, { size: 20 })} colorClass={activeColumnData.color} isMobile onPomodoroComplete={handlePomodoroComplete} onPomodoroUpdate={handlePomodoroUpdate} />
+                {mobileActiveColumn === 'DONE' && (
+                  <Column title={activeColumnData.title} status={mobileActiveColumn as TaskStatus} tasks={activeColumnData.tasks} viewMode={viewMode} onDropTask={handleDropTask} onDeleteTask={handleDeleteTask} onAddTask={openNewTaskModal} onEditTask={openEditTaskModal} onDuplicateTask={openDuplicateTaskModal} onToggleComplete={handleToggleComplete} onAddComment={handleAddComment} onOpenImageModal={openImageModal} icon={React.createElement(activeColumnData.icon, { size: 20 })} colorClass={activeColumnData.color} isMobile onPomodoroComplete={handlePomodoroComplete} onPomodoroUpdate={handlePomodoroUpdate} />
                 )}
                 
             </main>
-            <MobileBottomNav activeColumn={mobileActiveColumn} onColumnChange={setMobileActiveColumn} counts={{ [TaskStatus.TODO]: todoTasks.length, [TaskStatus.IN_PROGRESS]: inProgressTasks.length, [TaskStatus.DONE]: doneTasks.length }} />
+            <MobileBottomNav activeColumn={mobileActiveColumn as TaskStatus} onColumnChange={setMobileActiveColumn} counts={{ 'TODO': todoTasks.length, 'IN_PROGRESS': inProgressTasks.length, 'DONE': doneTasks.length }} />
             <MobileSidebar isOpen={isMobileSidebarOpen} onClose={() => setIsMobileSidebarOpen(false)} projects={projects} activeProjectId={activeProjectId} onSelectProject={setActiveProjectId} onAddProject={openAddProjectModal} onEditProject={openEditProjectModal} onDeleteProject={initiateDeleteProject} taskCounts={taskCountsByProject} activeAssignee={selectedMember} onSelectAssignee={setSelectedMember} />
         </>
     );
@@ -890,15 +893,16 @@ const App: React.FC = () => {
   return (
     <div className="flex flex-col md:flex-row h-screen bg-slate-950 overflow-hidden text-slate-300">
       {isMobile ? renderMobileView() : renderDesktopView()}
-      <NewTaskModal isOpen={isTaskModalOpen} onClose={() => { setIsTaskModalOpen(false); setEditingTask(null); setDuplicatingTask(null); }} onSave={handleSaveTask} onTaskUpdate={handleTaskUpdate} initialStatus={modalDefaultStatus} projects={projects} activeProjectId={activeProjectId} taskToEdit={editingTask} taskToDuplicate={duplicatingTask} />
+      <NewTaskModal isOpen={isTaskModalOpen} onClose={() => { setIsTaskModalOpen(false); setEditingTask(null); setDuplicatingTask(null); }} onSave={handleSaveTask} onTaskUpdate={handleTaskUpdate} initialStatus={modalDefaultStatus as TaskStatus} projects={projects} activeProjectId={activeProjectId} taskToEdit={editingTask} taskToDuplicate={duplicatingTask} columns={columns} />
       <NewProjectModal isOpen={isProjectModalOpen} onClose={() => { setIsProjectModalOpen(false); setEditingProject(null); }} onSave={handleProjectSave} onDelete={initiateDeleteProject} projectToEdit={editingProject} />
+      <NewColumnModal isOpen={isColumnModalOpen} onClose={() => setIsColumnModalOpen(false)} onSave={handleColumnSave} />
       <CommentsModal isOpen={commentsModalOpen} onClose={() => { setCommentsModalOpen(false); setSelectedTaskForComments(null); }} task={selectedTaskForComments!} onSaveComment={handleSaveComment} currentUser={currentCommentingUser} onCurrentUserChange={setCurrentCommentingUser} />
       <ConfirmModal isOpen={!!projectToDelete} onClose={() => setProjectToDelete(null)} onConfirm={confirmDeleteProject} title="Eliminar Proyecto" message="¿Estás seguro de que deseas eliminar este proyecto? Esta acción eliminará permanentemente todas las tareas asociadas y no se puede deshacer." />
       <ErrorModal isOpen={!!error} message={error} onClose={() => setError(null)} />
       <ImageModal isOpen={imageModalOpen} onClose={() => { setImageModalOpen(false); setSelectedImage(''); }} imageSrc={selectedImage} alt="Imagen de tarea" />
       {isCompletedTasksViewOpen && (
         <CompletedTasksView
-          tasks={[...completedTasks, ...tasks.filter(t => t.status === TaskStatus.DONE)]}
+          tasks={[...completedTasks, ...tasks.filter(t => t.status === 'DONE')]}
           projects={projects}
           onRestoreTask={handleRestoreCompletedTask}
           onPermanentDelete={handlePermanentDeleteCompletedTask}

@@ -1,37 +1,31 @@
 import React, { useState } from 'react';
-import { TaskStatus } from '../types';
+import { TaskStatus, BoardColumn } from '../types';
 import { ChevronDown } from 'lucide-react';
 
 interface StatusSelectorProps {
   currentStatus: TaskStatus;
   onStatusChange: (newStatus: TaskStatus) => void;
+  columns: BoardColumn[];
   size?: 'sm' | 'md';
 }
 
 const StatusSelector: React.FC<StatusSelectorProps> = ({
   currentStatus,
   onStatusChange,
+  columns,
   size = 'sm'
 }) => {
   const [isOpen, setIsOpen] = useState(false);
 
-  const statusConfig = {
-    [TaskStatus.TODO]: {
-      label: 'Pendiente',
-      color: 'bg-slate-500',
-      hoverColor: 'hover:bg-slate-600'
-    },
-    [TaskStatus.IN_PROGRESS]: {
-      label: 'En curso',
-      color: 'bg-amber-500',
-      hoverColor: 'hover:bg-amber-600'
-    },
-    [TaskStatus.DONE]: {
-      label: 'Terminado',
-      color: 'bg-emerald-500',
-      hoverColor: 'hover:bg-emerald-600'
-    }
-  };
+  const statusConfig = columns.reduce((acc, column) => {
+    const colorBase = column.color.split('-')[1]; // e.g., 'blue' from 'text-blue-400'
+    acc[column.status] = {
+      label: column.name,
+      color: `bg-${colorBase}-500`,
+      hoverColor: `hover:bg-${colorBase}-600`
+    };
+    return acc;
+  }, {} as Record<TaskStatus, { label: string; color: string; hoverColor: string }>);
 
   const currentConfig = statusConfig[currentStatus];
 

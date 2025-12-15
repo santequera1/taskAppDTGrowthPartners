@@ -6,18 +6,14 @@ import { TaskStatus } from '../types';
 interface MobileBottomNavProps {
   activeColumn: TaskStatus;
   onColumnChange: (status: TaskStatus) => void;
-  counts: {
-    [TaskStatus.TODO]: number;
-    [TaskStatus.IN_PROGRESS]: number;
-    [TaskStatus.DONE]: number;
-  };
+  counts: Record<TaskStatus, number>;
 }
 
 const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ activeColumn, onColumnChange, counts }) => {
   const navItems = [
-    { status: TaskStatus.TODO, icon: Circle, label: 'Tareas' },
-    { status: TaskStatus.IN_PROGRESS, icon: Clock, label: 'En Curso' },
-    { status: TaskStatus.DONE, icon: CheckCircle2, label: 'Terminada' },
+    { status: 'TODO' as TaskStatus, icon: Circle, label: 'Tareas' },
+    { status: 'IN_PROGRESS' as TaskStatus, icon: Clock, label: 'En Curso' },
+    { status: 'DONE' as TaskStatus, icon: CheckCircle2, label: 'Terminada' },
   ];
 
   const getButtonClass = (status: TaskStatus) => {

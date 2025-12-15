@@ -1,11 +1,12 @@
 import React, { useState, useMemo } from 'react';
-import { Task, TaskStatus, Project } from '../types';
+import { Task, TaskStatus, Project, BoardColumn } from '../types';
 import StatusSelector from './StatusSelector';
 import { GripVertical, Plus } from 'lucide-react';
 
 interface UnifiedTaskListProps {
   tasks: Task[];
   projects: Project[];
+  columns: BoardColumn[];
   onEditTask: (task: Task) => void;
   onToggleComplete: (id: string, status: TaskStatus) => void;
   onAddTask?: () => void;
@@ -14,6 +15,7 @@ interface UnifiedTaskListProps {
 const UnifiedTaskList: React.FC<UnifiedTaskListProps> = ({
   tasks,
   projects,
+  columns,
   onEditTask,
   onToggleComplete,
   onAddTask
@@ -44,9 +46,11 @@ const UnifiedTaskList: React.FC<UnifiedTaskListProps> = ({
 
   const statusFilterOptions = [
     { value: 'all' as const, label: 'Todos', count: tasks.length },
-    { value: TaskStatus.TODO, label: 'Pendiente', count: tasks.filter(t => t.status === TaskStatus.TODO).length },
-    { value: TaskStatus.IN_PROGRESS, label: 'En curso', count: tasks.filter(t => t.status === TaskStatus.IN_PROGRESS).length },
-    { value: TaskStatus.DONE, label: 'Terminado', count: tasks.filter(t => t.status === TaskStatus.DONE).length }
+    ...columns.map(column => ({
+      value: column.status,
+      label: column.name,
+      count: tasks.filter(t => t.status === column.status).length
+    }))
   ];
 
   return (
@@ -130,6 +134,7 @@ const UnifiedTaskList: React.FC<UnifiedTaskListProps> = ({
                   <StatusSelector
                     currentStatus={task.status}
                     onStatusChange={(newStatus) => onToggleComplete(task.id, newStatus)}
+                    columns={columns}
                     size="sm"
                   />
                 </div>
@@ -141,7 +146,7 @@ const UnifiedTaskList: React.FC<UnifiedTaskListProps> = ({
                 >
                   <div className="flex items-center gap-3">
                     <h3 className={`font-medium text-sm ${
-                      task.status === TaskStatus.DONE
+                      task.status === 'DONE'
                         ? 'text-slate-500 line-through'
                         : 'text-slate-100 group-hover:text-white'
                     }`}>

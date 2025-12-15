@@ -4,6 +4,8 @@ export enum TaskStatus {
   DONE = 'DONE'
 }
 
+export const DEFAULT_STATUSES: TaskStatus[] = [TaskStatus.TODO, TaskStatus.IN_PROGRESS, TaskStatus.DONE];
+
 export enum Priority {
   LOW = 'LOW',
   MEDIUM = 'MEDIUM',
@@ -66,10 +68,54 @@ export interface Project {
   order?: number; // Order for sorting projects
 }
 
+export interface BoardColumn {
+  id: string;
+  name: string;
+  color: string; // Tailwind color class for the column header
+  icon?: string; // Lucide icon name
+  order: number;
+  isDefault?: boolean; // Cannot be deleted if true
+  createdAt: number;
+  status: string;
+}
+
 export const DEFAULT_PROJECTS: Project[] = [
   { id: 'p1', name: 'Equilibrio Clinic', color: 'bg-indigo-500' },
   { id: 'p2', name: 'E-commerce V1', color: 'bg-rose-500' },
   { id: 'p3', name: 'Interno', color: 'bg-slate-500' },
+];
+
+export const DEFAULT_COLUMNS: BoardColumn[] = [
+  {
+    id: 'col-todo',
+    name: 'Tarea',
+    color: 'text-blue-400',
+    icon: 'Circle',
+    order: 0,
+    isDefault: true,
+    createdAt: Date.now(),
+    status: TaskStatus.TODO
+  },
+  {
+    id: 'col-in-progress',
+    name: 'En curso',
+    color: 'text-amber-400',
+    icon: 'Clock',
+    order: 1,
+    isDefault: true,
+    createdAt: Date.now(),
+    status: TaskStatus.IN_PROGRESS
+  },
+  {
+    id: 'col-done',
+    name: 'Terminada',
+    color: 'text-emerald-400',
+    icon: 'CheckCircle2',
+    order: 2,
+    isDefault: true,
+    createdAt: Date.now(),
+    status: TaskStatus.DONE
+  }
 ];
 
 export interface TaskComment {
@@ -83,7 +129,7 @@ export interface Task {
   id: string;
   title: string;
   description: string;
-  status: TaskStatus;
+  status: string;
   priority: Priority;
   assignee: TeamMemberName;
   creator: TeamMemberName;
@@ -130,5 +176,7 @@ export type NewProject = Omit<Project, 'id'>;
 
 export interface DragItem {
   id: string;
-  status: TaskStatus;
+  columnId: string; // Changed from status to columnId
 }
+
+export type NewColumn = Omit<BoardColumn, 'id' | 'createdAt'>;

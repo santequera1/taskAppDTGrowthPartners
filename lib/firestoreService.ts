@@ -1,7 +1,7 @@
 
 import { db } from "./firebase";
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, arrayUnion, increment, where, getDoc } from "firebase/firestore";
-import { Task, Project } from '../types';
+import { Task, Project, BoardColumn } from '../types';
 
 const TASKS_COLLECTION = 'tasks';
 const PROJECTS_COLLECTION = 'projects';
@@ -247,4 +247,32 @@ export const restoreDeletedTask = async (deletedTaskId: string): Promise<string>
 
 export const permanentlyDeleteTask = async (deletedTaskId: string): Promise<void> => {
   await deleteDoc(doc(db, DELETED_TASKS_COLLECTION, deletedTaskId));
+};
+
+// Board Columns Management
+const COLUMNS_COLLECTION = 'board_columns';
+
+export const loadColumns = async (): Promise<BoardColumn[]> => {
+  const q = query(collection(db, COLUMNS_COLLECTION), orderBy('order', 'asc'));
+  const querySnapshot = await getDocs(q);
+  return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as BoardColumn));
+};
+
+export const createColumn = async (column: Omit<BoardColumn, 'id'>): Promise<string> => {
+  const docRef = await addDoc(collection(db, COLUMNS_COLLECTION), column);
+  return docRef.id;
+};
+
+export const updateColumn = async (id: string, column: Partial<BoardColumn>): Promise<void> => {
+  const columnRef = doc(db, COLUMNS_COLLECTION, id);
+  await updateDoc(columnRef, column);
+};
+
+export const deleteColumn = async (id: string): Promise<void> => {
+  await deleteDoc(doc(db, COLUMNS_COLLECTION, id));
+};
+
+export const updateColumnOrder = async (columnId: string, order: number): Promise<void> => {
+  const columnRef = doc(db, COLUMNS_COLLECTION, columnId);
+  await updateDoc(columnRef, { order });
 };

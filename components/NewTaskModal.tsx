@@ -29,9 +29,10 @@ interface NewTaskModalProps {
   activeProjectId: string | null;
   taskToEdit?: Task | null;
   taskToDuplicate?: Task | null;
+  columns: import('../types').BoardColumn[];
 }
 
-const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, onSave, onTaskUpdate, initialStatus, projects, activeProjectId, taskToEdit: editingTask, taskToDuplicate }) => {
+const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, onSave, onTaskUpdate, initialStatus, projects, activeProjectId, taskToEdit: editingTask, taskToDuplicate, columns }) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<Priority>(Priority.MEDIUM);
@@ -434,9 +435,9 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, onSave, on
                 onChange={(e) => setStatus(e.target.value as TaskStatus)}
                 className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 md:p-3 text-sm md:text-base text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                 >
-                <option value={TaskStatus.TODO}>Tarea</option>
-                <option value={TaskStatus.IN_PROGRESS}>En curso</option>
-                <option value={TaskStatus.DONE}>Terminada</option>
+                {columns.map(column => (
+                  <option key={column.status} value={column.status}>{column.name}</option>
+                ))}
                 </select>
             </div>
           </div>

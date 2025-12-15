@@ -161,10 +161,10 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, project, onDelete, onEdit, on
 
             {task.dueDate && (
               <div className="flex items-start justify-between">
-                <div className={`flex items-center gap-1.5 text-[10px] font-medium px-1.5 py-0.5 rounded-md ${dateBadgeColor}`}>
+              <div className={`flex items-center gap-1.5 text-[10px] font-medium px-1.5 py-0.5 rounded-md ${dateBadgeColor}`}>
                   {task.status !== TaskStatus.DONE && isOverdue(task.dueDate) ? <AlertCircle size={12} /> : <Clock size={12} />}
                   <span>{task.status === TaskStatus.DONE ? 'Completada' : formatRelativeDate(task.dueDate)}</span>
-                </div>
+              </div>
 
                 <div className="flex flex-col items-end">
                   <div className="flex items-center gap-2">

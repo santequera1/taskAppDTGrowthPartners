@@ -3,7 +3,7 @@ import { Task, TaskStatus } from '../types';
 import TaskCard from './TaskCard';
 import TaskListItem from './TaskListItem';
 import TaskCompactListItem from './TaskCompactListItem';
-import { Plus } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 
 interface ColumnProps {
   title: string;
@@ -24,6 +24,8 @@ interface ColumnProps {
   onPomodoroComplete?: (taskId: string, session: import('../types').PomodoroSession) => void;
   onPomodoroUpdate?: (taskId: string, state: { pomodoroStatus?: string; currentPomodoroTime?: number | null }) => void;
   className?: string;
+  isDefault?: boolean;
+  onDeleteColumn?: () => void;
 }
 
 const Column: React.FC<ColumnProps> = ({
@@ -43,7 +45,9 @@ const Column: React.FC<ColumnProps> = ({
   colorClass,
   isMobile = false,
   onPomodoroComplete, onPomodoroUpdate,
-  className = ''
+  className = '',
+  isDefault = false,
+  onDeleteColumn
 }) => {
   const [isOver, setIsOver] = useState(false);
 
@@ -97,14 +101,24 @@ const Column: React.FC<ColumnProps> = ({
              <span className="text-xs text-slate-500 font-medium">{tasks.length} tasks</span>
           </div>
         </div>
-        {onAddTask && !isMobile && (
-          <button 
-            onClick={() => onAddTask(status)}
-            className="p-1.5 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors"
-          >
-            <Plus size={20} />
-          </button>
-        )}
+        <div className="flex items-center gap-1">
+          {onAddTask && !isMobile && (
+            <button
+              onClick={() => onAddTask(status)}
+              className="p-1.5 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors"
+            >
+              <Plus size={20} />
+            </button>
+          )}
+          {onDeleteColumn && !isDefault && !isMobile && (
+            <button
+              onClick={onDeleteColumn}
+              className="p-1.5 hover:bg-red-700 rounded-lg text-slate-400 hover:text-red-400 transition-colors"
+            >
+              <Trash2 size={20} />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Tasks List */}
