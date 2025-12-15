@@ -97,40 +97,58 @@ const UnifiedTaskList: React.FC<UnifiedTaskListProps> = ({
         )}
       </div>
 
-      {/* Task List */}
+      {/* Task List - Ultra Compact Table View */}
       <div className="flex-1 overflow-y-auto">
-        <div className="divide-y divide-slate-700/50">
+        {/* Table Header */}
+        <div className="sticky top-0 bg-slate-900/95 backdrop-blur-sm border-b border-slate-700/50 z-10">
+          <div className="flex items-center gap-3 px-3 py-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+            <div className="w-4"></div> {/* Drag handle space */}
+            <div className="w-16">Estado</div>
+            <div className="flex-1 min-w-0">Tarea</div>
+            <div className="w-20 text-center">Proyecto</div>
+            <div className="w-12 text-center">Pri.</div>
+            <div className="w-20 text-right">Asignado</div>
+          </div>
+        </div>
+
+        {/* Task Rows */}
+        <div className="divide-y divide-slate-700/30">
           {tasksWithProjects.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="text-slate-500 mb-2">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1">
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <div className="text-slate-600 mb-2">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1">
                   <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
-              <h3 className="text-lg font-medium text-slate-400 mb-1">No hay tareas</h3>
               <p className="text-sm text-slate-500">
                 {statusFilter === 'all'
-                  ? 'Crea tu primera tarea para comenzar'
-                  : `No hay tareas ${statusFilterOptions.find(opt => opt.value === statusFilter)?.label.toLowerCase()}`
+                  ? 'Sin tareas'
+                  : `Sin tareas ${statusFilterOptions.find(opt => opt.value === statusFilter)?.label.toLowerCase()}`
                 }
               </p>
             </div>
           ) : (
-            tasksWithProjects.map((task) => (
+            tasksWithProjects.map((task, index) => (
               <div
                 key={task.id}
-                className="group flex items-center gap-4 p-4 hover:bg-slate-800/30 transition-colors border-l-4 border-transparent hover:border-slate-600"
+                className={`group flex items-center gap-3 px-3 py-2 hover:bg-slate-800/30 transition-all duration-100 cursor-pointer border-l-2 border-transparent hover:border-blue-500/40 ${
+                  index % 2 === 0 ? 'bg-slate-900/10' : 'bg-transparent'
+                }`}
                 draggable
                 onDragStart={(e) => handleDragStart(e, task)}
                 onDragEnd={handleDragEnd}
+                onClick={() => onEditTask(task)}
               >
-                {/* Drag Handle */}
-                <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing">
-                  <GripVertical size={16} className="text-slate-500" />
+                {/* Drag Handle - Minimal */}
+                <div className="flex-shrink-0 w-4 opacity-0 group-hover:opacity-40 transition-opacity cursor-grab active:cursor-grabbing">
+                  <GripVertical size={12} className="text-slate-600" />
                 </div>
 
-                {/* Status Selector */}
-                <div className="flex-shrink-0">
+                {/* Status - Text only, ultra compact */}
+                <div
+                  className="flex-shrink-0 w-16"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <StatusSelector
                     currentStatus={task.status}
                     onStatusChange={(newStatus) => onToggleComplete(task.id, newStatus)}
@@ -139,57 +157,57 @@ const UnifiedTaskList: React.FC<UnifiedTaskListProps> = ({
                   />
                 </div>
 
-                {/* Task Content */}
-                <div
-                  className="flex-1 min-w-0 cursor-pointer"
-                  onClick={() => onEditTask(task)}
-                >
-                  <div className="flex items-center gap-3">
-                    <h3 className={`font-medium text-sm ${
-                      task.status === 'DONE'
-                        ? 'text-slate-500 line-through'
-                        : 'text-slate-100 group-hover:text-white'
-                    }`}>
-                      {task.title}
-                    </h3>
+                {/* Task Title - Main focus */}
+                <div className="flex-1 min-w-0">
+                  <span className={`text-[13px] font-medium truncate block ${
+                    task.status === 'DONE'
+                      ? 'text-slate-500 line-through'
+                      : 'text-slate-200 group-hover:text-white'
+                  }`}>
+                    {task.title}
+                  </span>
+                </div>
 
-                    {/* Project Badge */}
-                    {task.project && (
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded ${task.project.color} text-white bg-opacity-80`}>
+                {/* Project - Minimal indicator */}
+                <div className="flex-shrink-0 w-20 flex items-center justify-center">
+                  {task.project ? (
+                    <div className="flex items-center gap-1.5 max-w-full">
+                      <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${task.project.color}`} />
+                      <span className="text-[10px] font-medium text-slate-400 truncate">
                         {task.project.name}
                       </span>
-                    )}
-
-                    {/* Priority Indicator */}
-                    {task.priority && (
-                      <span className={`text-xs px-2 py-0.5 rounded font-medium ${
-                        task.priority === 'HIGH' ? 'bg-red-500/20 text-red-400' :
-                        task.priority === 'MEDIUM' ? 'bg-amber-500/20 text-amber-400' :
-                        'bg-emerald-500/20 text-emerald-400'
-                      }`}>
-                        {task.priority === 'HIGH' ? 'ALTA' :
-                         task.priority === 'MEDIUM' ? 'MEDIA' : 'BAJA'}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Description */}
-                  {task.description && (
-                    <p className="text-xs text-slate-400 mt-1 line-clamp-1">
-                      {task.description}
-                    </p>
+                    </div>
+                  ) : (
+                    <span className="text-[10px] text-slate-600">—</span>
                   )}
                 </div>
 
-                {/* Assignee */}
-                <div className="flex-shrink-0 text-right">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-400">
-                      {task.assignee}
+                {/* Priority - Single letter */}
+                <div className="flex-shrink-0 w-12 flex items-center justify-center">
+                  {task.priority ? (
+                    <span className={`text-[11px] font-bold ${
+                      task.priority === 'HIGH' ? 'text-red-400' :
+                      task.priority === 'MEDIUM' ? 'text-amber-400' :
+                      'text-emerald-400'
+                    }`} title={
+                      task.priority === 'HIGH' ? 'Alta' :
+                      task.priority === 'MEDIUM' ? 'Media' : 'Baja'
+                    }>
+                      {task.priority === 'HIGH' ? 'H' :
+                       task.priority === 'MEDIUM' ? 'M' : 'L'}
                     </span>
-                    <div className="w-6 h-6 rounded-full bg-slate-600 flex items-center justify-center text-xs font-bold text-white">
-                      {task.assignee.charAt(0).toUpperCase()}
-                    </div>
+                  ) : (
+                    <span className="text-[10px] text-slate-600">—</span>
+                  )}
+                </div>
+
+                {/* Assignee - Initials only */}
+                <div className="flex-shrink-0 w-20 flex items-center justify-end gap-1.5">
+                  <span className="text-[10px] text-slate-500 truncate max-w-12">
+                    {task.assignee}
+                  </span>
+                  <div className="w-5 h-5 rounded-full bg-slate-700 flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0">
+                    {task.assignee.charAt(0).toUpperCase()}
                   </div>
                 </div>
               </div>

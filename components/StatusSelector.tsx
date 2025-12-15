@@ -35,14 +35,14 @@ const StatusSelector: React.FC<StatusSelectorProps> = ({
   };
 
   const sizeClasses = size === 'sm'
-    ? 'px-2 py-0.5 text-xs'
+    ? 'px-2 py-0.5 text-[10px]'
     : 'px-3 py-1 text-sm';
 
   return (
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`inline-flex items-center gap-1.5 ${sizeClasses} rounded-full text-white font-medium transition-colors ${currentConfig.color} ${currentConfig.hoverColor}`}
+        className={`inline-flex items-center gap-1.5 ${sizeClasses} rounded-full text-white font-medium transition-colors whitespace-nowrap ${currentConfig.color} ${currentConfig.hoverColor}`}
       >
         <span>{currentConfig.label}</span>
         <ChevronDown size={size === 'sm' ? 10 : 12} />

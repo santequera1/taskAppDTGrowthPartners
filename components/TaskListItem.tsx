@@ -44,11 +44,11 @@ const TaskListItem: React.FC<TaskListItemProps> = ({
   return (
     <div
       onClick={() => onEdit(task)}
-      className="group w-full bg-slate-800/20 hover:bg-slate-800/40 border border-slate-700/20 hover:border-slate-600/40 rounded-md px-3 py-2.5 transition-all duration-150 cursor-pointer"
+      className="group w-full bg-slate-800/10 hover:bg-slate-800/30 border-b border-slate-700/10 hover:border-slate-600/20 px-4 py-3 transition-all duration-200 cursor-pointer hover:shadow-lg hover:shadow-black/5"
     >
-      <div className="flex items-center gap-4">
-        {/* Zona A: Checkbox - Perfectamente centrado */}
-        <div className="flex-shrink-0 self-center">
+      <div className="flex items-start gap-4">
+        {/* Zona A: Checkbox */}
+        <div className="flex-shrink-0 pt-0.5">
           <button
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => {
@@ -56,98 +56,129 @@ const TaskListItem: React.FC<TaskListItemProps> = ({
               const newStatus = task.status === TaskStatus.DONE ? TaskStatus.IN_PROGRESS : TaskStatus.DONE;
               onToggleComplete(task.id, newStatus);
             }}
-            className={`w-4 h-4 rounded border transition-all duration-150 flex items-center justify-center ${
+            className={`w-5 h-5 rounded border-2 transition-all duration-200 flex items-center justify-center ${
               task.status === TaskStatus.DONE
-                ? 'bg-emerald-500 border-emerald-500 text-white'
-                : 'border-slate-500 hover:border-slate-400 bg-slate-800/30'
+                ? 'bg-emerald-500 border-emerald-500 text-white shadow-sm shadow-emerald-500/20'
+                : 'border-slate-600 hover:border-slate-400 bg-slate-800/40 hover:bg-slate-700/40'
             }`}
           >
-            {task.status === TaskStatus.DONE && <Check size={10} />}
+            {task.status === TaskStatus.DONE && <Check size={12} strokeWidth={3} />}
           </button>
         </div>
 
         {/* Zona B: Contenido Principal */}
-        <div className="flex-1 min-w-0">
-          {/* Título prominente con hasta 2 líneas */}
-          <h3 className="font-semibold text-slate-100 text-sm leading-snug mb-1.5 line-clamp-2 break-words">
+        <div className="flex-1 min-w-0 space-y-2">
+          {/* Título prominente */}
+          <h3 className={`font-semibold text-[15px] leading-snug line-clamp-2 break-words ${
+            task.status === TaskStatus.DONE ? 'text-slate-400 line-through' : 'text-slate-50'
+          }`}>
             {task.title}
           </h3>
 
-          {/* Badges ordenados: Prioridad → Proyecto → Categoría */}
-          <div className="flex items-center gap-1.5 mb-2">
+          {/* Metadata Row - Prioridad, Proyecto, Tipo en una línea compacta */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Indicador de prioridad minimalista */}
             {task.priority && (
-              <span className={`text-[10px] px-1.5 py-0.5 rounded-sm font-medium border ${
-                task.priority === 'HIGH' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
-                task.priority === 'MEDIUM' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-              }`}>
-                {task.priority === 'HIGH' ? 'ALTA' :
-                 task.priority === 'MEDIUM' ? 'MEDIA' : 'BAJA'}
-              </span>
+              <div className="flex items-center gap-1.5">
+                <div className={`w-1.5 h-1.5 rounded-full ${
+                  task.priority === 'HIGH' ? 'bg-red-400 shadow-sm shadow-red-400/50' :
+                  task.priority === 'MEDIUM' ? 'bg-amber-400 shadow-sm shadow-amber-400/50' :
+                  'bg-emerald-400 shadow-sm shadow-emerald-400/50'
+                }`} />
+                <span className={`text-[11px] font-medium ${
+                  task.priority === 'HIGH' ? 'text-red-400/90' :
+                  task.priority === 'MEDIUM' ? 'text-amber-400/90' :
+                  'text-emerald-400/90'
+                }`}>
+                  {task.priority === 'HIGH' ? 'Alta' :
+                   task.priority === 'MEDIUM' ? 'Media' : 'Baja'}
+                </span>
+              </div>
             )}
 
+            {/* Separador sutil */}
+            {task.priority && (project || task.type) && (
+              <div className="w-0.5 h-3 bg-slate-700/30" />
+            )}
+
+            {/* Proyecto con color distintivo */}
             {project && (
-              <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-sm border ${project.color} text-white bg-opacity-80 border-opacity-20`}>
-                {project.name}
-              </span>
+              <div className="flex items-center gap-1.5">
+                <div className={`w-1.5 h-1.5 rounded-full ${project.color}`} />
+                <span className="text-[11px] font-medium text-slate-300">
+                  {project.name}
+                </span>
+              </div>
             )}
 
+            {/* Tipo de tarea */}
             {task.type && (
-              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-sm bg-slate-700/50 text-slate-300 border border-slate-600/20">
-                {task.type}
-              </span>
+              <>
+                {project && <div className="w-0.5 h-3 bg-slate-700/30" />}
+                <span className="text-[11px] font-medium text-slate-400/80">
+                  {task.type}
+                </span>
+              </>
             )}
           </div>
 
-          {/* Descripción opcional con menor peso */}
+          {/* Descripción sutil */}
           {task.description && (
-            <p className="text-xs text-slate-400 leading-relaxed line-clamp-1 mb-2">
+            <p className="text-xs text-slate-500 leading-relaxed line-clamp-1">
               {task.description}
             </p>
           )}
         </div>
 
-        {/* Zona C: Metadatos - Fila inferior organizada */}
-        <div className="flex-shrink-0 flex items-center gap-3 text-[10px]">
-          {/* Fecha con ícono consistente */}
+        {/* Zona C: Metadata Secundaria (Right Sidebar) */}
+        <div className="flex-shrink-0 flex flex-col items-end gap-2.5 pt-0.5">
+          {/* Fecha */}
           {task.dueDate && (
-            <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${dateBadgeColor} border border-opacity-15`}>
+            <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${
+              task.status === TaskStatus.DONE
+                ? 'bg-slate-700/20 text-slate-500'
+                : dateBadgeColor.includes('red')
+                ? 'bg-red-500/10 text-red-400/90'
+                : dateBadgeColor.includes('yellow')
+                ? 'bg-amber-500/10 text-amber-400/90'
+                : 'bg-slate-700/30 text-slate-400'
+            }`}>
               {task.status !== TaskStatus.DONE && isOverdue(task.dueDate) ?
-                <AlertCircle size={10} /> :
-                <Clock size={10} />
+                <AlertCircle size={11} strokeWidth={2.5} /> :
+                <Clock size={11} strokeWidth={2.5} />
               }
-              <span>{task.status === TaskStatus.DONE ? 'Completada' : formatRelativeDate(task.dueDate)}</span>
+              <span>{task.status === TaskStatus.DONE ? 'Hecho' : formatRelativeDate(task.dueDate)}</span>
             </div>
           )}
 
-          {/* Asignado con avatar compacto */}
-          <div className="flex items-center gap-1.5">
-            <div className={`w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold text-white ${assignee.color}`}>
+          {/* Avatar y nombre del asignado */}
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-slate-500 font-medium">Asignado a</span>
+            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white ${assignee.color} shadow-sm`}>
               {assignee.initials}
             </div>
-            <span className="text-slate-400 font-medium truncate max-w-16">{assignee.name}</span>
           </div>
 
-          {/* Meta-info: comentarios e imágenes */}
-          <div className="flex items-center gap-2">
+          {/* Indicators row: comentarios, imágenes, drag handle */}
+          <div className="flex items-center gap-3">
             {onAddComment && (task.comments?.length || 0) > 0 && (
-              <div className="flex items-center gap-0.5 text-slate-500">
-                <MessageCircle size={10} />
-                <span className="font-medium">{task.comments!.length}</span>
+              <div className="flex items-center gap-1 text-slate-500 hover:text-slate-400 transition-colors">
+                <MessageCircle size={11} />
+                <span className="text-[11px] font-semibold">{task.comments!.length}</span>
               </div>
             )}
 
             {task.images && task.images.length > 0 && (
-              <div className="flex items-center gap-0.5 text-slate-500">
-                <span>📎</span>
-                <span className="font-medium">{task.images.length}</span>
+              <div className="flex items-center gap-1 text-slate-500 hover:text-slate-400 transition-colors">
+                <span className="text-xs">📎</span>
+                <span className="text-[11px] font-semibold">{task.images.length}</span>
               </div>
             )}
-          </div>
 
-          {/* Drag handle - Solo visible en hover */}
-          <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 cursor-grab active:cursor-grabbing">
-            <GripVertical size={12} className="text-slate-500" />
+            {/* Drag handle */}
+            <div className="opacity-0 group-hover:opacity-60 hover:opacity-100 transition-opacity duration-200 cursor-grab active:cursor-grabbing">
+              <GripVertical size={14} className="text-slate-500" />
+            </div>
           </div>
         </div>
       </div>
