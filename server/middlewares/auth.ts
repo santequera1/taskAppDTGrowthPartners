@@ -4,9 +4,9 @@ import prisma from '../config/database';
 
 export interface AuthRequest extends Request {
   user?: {
-    id: number;
+    id: string;
     email: string;
-    roleId: number;
+    roleId: string;
   };
 }
 
@@ -25,7 +25,7 @@ export const authenticateToken = async (
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret') as {
-      userId: number;
+      userId: string;
       email: string;
     };
 
@@ -58,10 +58,10 @@ export const isAdmin = async (
 
   const user = await prisma.user.findUnique({
     where: { id: req.user.id },
-    include: { role: true },
+    include: { Role: true },
   });
 
-  if (!user || user.role.name !== 'admin') {
+  if (!user || user.Role.name !== 'admin') {
     res.status(403).json({ error: 'Acceso denegado. Se requiere rol de administrador' });
     return;
   }

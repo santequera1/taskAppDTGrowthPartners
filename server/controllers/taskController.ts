@@ -2,35 +2,27 @@ import { Response } from 'express';
 import { AuthRequest } from '../middlewares/auth';
 import prisma from '../config/database';
 
+// Función para generar IDs únicos
+const generateId = () => {
+  return 'c' + Math.random().toString(36).substring(2) + Date.now().toString(36);
+};
+
 export const getTasks = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { projectId, columnId, status, priority } = req.query;
+    const { status, priority } = req.query;
 
     const where: any = {};
 
-    if (projectId) where.projectId = Number(projectId);
-    if (columnId) where.columnId = Number(columnId);
     if (status) where.status = status;
     if (priority) where.priority = priority;
 
     const tasks = await prisma.task.findMany({
       where,
       include: {
-        user: {
+        User: {
           select: { id: true, firstName: true, lastName: true, email: true },
         },
-        column: {
-          select: { id: true, name: true, color: true },
-        },
-        project: {
-          select: { id: true, name: true, color: true },
-        },
-        comments: {
-          include: {
-            user: {
-              select: { id: true, firstName: true, lastName: true },
-            },
-          },
+        TaskComment: {
           orderBy: { createdAt: 'desc' },
         },
       },
@@ -48,19 +40,12 @@ export const getTask = async (req: AuthRequest, res: Response): Promise<void> =>
     const { id } = req.params;
 
     const task = await prisma.task.findUnique({
-      where: { id: Number(id) },
+      where: { id },
       include: {
-        user: {
+        User: {
           select: { id: true, firstName: true, lastName: true, email: true },
         },
-        column: true,
-        project: true,
-        comments: {
-          include: {
-            user: {
-              select: { id: true, firstName: true, lastName: true },
-            },
-          },
+        TaskComment: {
           orderBy: { createdAt: 'desc' },
         },
       },
@@ -88,9 +73,6 @@ export const createTask = async (req: AuthRequest, res: Response): Promise<void>
       position,
       color,
       images,
-      columnId,
-      projectId,
-      userId,
     } = req.body;
 
     if (!title) {
@@ -98,8 +80,14 @@ export const createTask = async (req: AuthRequest, res: Response): Promise<void>
       return;
     }
 
+    if (!req.user) {
+      res.status(401).json({ error: 'Usuario no autenticado' });
+      return;
+    }
+
     const task = await prisma.task.create({
       data: {
+        id: generateId(),
         title,
         description,
         status: status || 'pending',
@@ -108,16 +96,13 @@ export const createTask = async (req: AuthRequest, res: Response): Promise<void>
         position: position || 0,
         color,
         images: images || [],
-        columnId: columnId ? Number(columnId) : null,
-        projectId: projectId ? Number(projectId) : null,
-        userId: userId ? Number(userId) : req.user?.id,
+        createdBy: req.user.id,
+        updatedAt: new Date(),
       },
       include: {
-        user: {
+        User: {
           select: { id: true, firstName: true, lastName: true, email: true },
         },
-        column: true,
-        project: true,
       },
     });
 
@@ -139,13 +124,10 @@ export const updateTask = async (req: AuthRequest, res: Response): Promise<void>
       position,
       color,
       images,
-      columnId,
-      projectId,
-      userId,
     } = req.body;
 
     const existingTask = await prisma.task.findUnique({
-      where: { id: Number(id) },
+      where: { id },
     });
 
     if (!existingTask) {
@@ -154,7 +136,7 @@ export const updateTask = async (req: AuthRequest, res: Response): Promise<void>
     }
 
     const task = await prisma.task.update({
-      where: { id: Number(id) },
+      where: { id },
       data: {
         title,
         description,
@@ -164,16 +146,12 @@ export const updateTask = async (req: AuthRequest, res: Response): Promise<void>
         position,
         color,
         images,
-        columnId: columnId !== undefined ? (columnId ? Number(columnId) : null) : undefined,
-        projectId: projectId !== undefined ? (projectId ? Number(projectId) : null) : undefined,
-        userId: userId !== undefined ? (userId ? Number(userId) : null) : undefined,
+        updatedAt: new Date(),
       },
       include: {
-        user: {
+        User: {
           select: { id: true, firstName: true, lastName: true, email: true },
         },
-        column: true,
-        project: true,
       },
     });
 
@@ -188,7 +166,7 @@ export const deleteTask = async (req: AuthRequest, res: Response): Promise<void>
     const { id } = req.params;
 
     const existingTask = await prisma.task.findUnique({
-      where: { id: Number(id) },
+      where: { id },
     });
 
     if (!existingTask) {
@@ -197,7 +175,7 @@ export const deleteTask = async (req: AuthRequest, res: Response): Promise<void>
     }
 
     await prisma.task.delete({
-      where: { id: Number(id) },
+      where: { id },
     });
 
     res.json({ message: 'Tarea eliminada exitosamente' });
@@ -209,20 +187,15 @@ export const deleteTask = async (req: AuthRequest, res: Response): Promise<void>
 export const addComment = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { content } = req.body;
+    const { text, author } = req.body;
 
-    if (!content) {
-      res.status(400).json({ error: 'El contenido del comentario es requerido' });
-      return;
-    }
-
-    if (!req.user) {
-      res.status(401).json({ error: 'Usuario no autenticado' });
+    if (!text) {
+      res.status(400).json({ error: 'El texto del comentario es requerido' });
       return;
     }
 
     const task = await prisma.task.findUnique({
-      where: { id: Number(id) },
+      where: { id },
     });
 
     if (!task) {
@@ -232,14 +205,10 @@ export const addComment = async (req: AuthRequest, res: Response): Promise<void>
 
     const comment = await prisma.taskComment.create({
       data: {
-        content,
-        taskId: Number(id),
-        userId: req.user.id,
-      },
-      include: {
-        user: {
-          select: { id: true, firstName: true, lastName: true },
-        },
+        id: generateId(),
+        text,
+        author: author || req.user?.email || 'Anónimo',
+        taskId: id,
       },
     });
 
@@ -259,12 +228,12 @@ export const updatePositions = async (req: AuthRequest, res: Response): Promise<
     }
 
     await prisma.$transaction(
-      tasks.map((task: { id: number; position: number; columnId?: number }) =>
+      tasks.map((task: { id: string; position: number }) =>
         prisma.task.update({
           where: { id: task.id },
           data: {
             position: task.position,
-            columnId: task.columnId !== undefined ? task.columnId : undefined,
+            updatedAt: new Date(),
           },
         })
       )
