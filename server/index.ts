@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import routes from './routes';
@@ -18,16 +18,16 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Rutas de la API
-app.use('/api', routes);
-
-// Ruta de salud
-app.get('/health', (req, res) => {
+// Ruta de salud (antes de las otras rutas)
+app.get('/health', (_req: Request, res: Response) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
+// Rutas de la API
+app.use('/api', routes);
+
 // Manejo de errores global
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   console.error('Error:', err);
   res.status(500).json({ error: 'Error interno del servidor' });
 });
@@ -39,10 +39,17 @@ const startServer = async () => {
     await prisma.$connect();
     console.log('Conectado a la base de datos PostgreSQL');
 
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
       console.log(`Servidor corriendo en http://localhost:${PORT}`);
       console.log(`Health check: http://localhost:${PORT}/health`);
     });
+
+    // Mantener el servidor activo
+    server.on('error', (error) => {
+      console.error('Error del servidor:', error);
+      process.exit(1);
+    });
+
   } catch (error) {
     console.error('Error al iniciar el servidor:', error);
     process.exit(1);
@@ -51,11 +58,13 @@ const startServer = async () => {
 
 // Manejo de cierre graceful
 process.on('SIGINT', async () => {
+  console.log('Cerrando servidor...');
   await prisma.$disconnect();
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
+  console.log('Cerrando servidor (SIGTERM)...');
   await prisma.$disconnect();
   process.exit(0);
 });
