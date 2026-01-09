@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\n✨ Rediseño de vistas Lista y Unificada - UI/UX Mejorado\n\nVista de Lista (TaskListItem):\n- Título más prominente (15px) con mejor jerarquía visual\n- Indicadores de prioridad minimalistas con puntos de color\n- Metadata organizada en 3 columnas: Checkbox → Contenido → Sidebar\n- Separación con border-bottom sutil en lugar de cards pesadas\n- Información secundaria agrupada a la derecha (fecha, asignado, acciones)\n- Checkbox más grande (5×5) con mejor feedback visual\n- Espaciado optimizado para mejor respiración\n\nVista Unificada (UnifiedTaskList):\n- Layout de tabla ultra-compacto para escaneo rápido\n- Header sticky con columnas definidas\n- Altura mínima por fila (~32px) para ver 30-50 tareas\n- Prioridad como letra única (H/M/L) con tooltip\n- Proyecto con punto de color + texto 10px\n- Avatar mini (5×5) solo con iniciales\n- Zebra striping + líneas divisorias horizontales\n- Sin ruido visual: eliminada descripción en vista compacta\n\nStatusSelector:\n- Texto reducido a 10px para mejor compactación\n- whitespace-nowrap para evitar saltos de línea en \"En curso\"\n- Botones uniformes en todas las vistas\n\n🎯 Objetivo: Productividad máxima con legibilidad mejorada\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git push:*)",
+      "Bash(npm install:*)",
+      "Bash(npx prisma init)",
+      "Bash(npx prisma generate:*)",
+      "Bash(git commit:*)",
+      "Bash(ssh ubuntu@149.56.133.201 \"cd ~/taskAppDTGrowthPartners && git pull origin main\")",
+      "Bash(ssh:*)"
+    ]
+  }
+}
