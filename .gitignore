@@ -52,3 +52,5 @@ subir_a_git.txt
 
 # Ignorar carpeta de actualizaciones
 ACTUALIZACIONES/
+
+/lib/generated/prisma

@@ -1,0 +1,164 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Modelo de Roles
+model Role {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  permissions Json?    @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  users       User[]
+
+  @@map("roles")
+}
+
+// Modelo de Usuarios
+model User {
+  id          Int           @id @default(autoincrement())
+  email       String        @unique
+  password    String?
+  firstName   String?
+  lastName    String?
+  firebaseUid String?       @unique
+  roleId      Int           @default(2)
+  role        Role          @relation(fields: [roleId], references: [id])
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  tasks       Task[]
+  comments    TaskComment[]
+
+  @@map("users")
+}
+
+// Modelo de Tareas
+model Task {
+  id          Int           @id @default(autoincrement())
+  title       String
+  description String?
+  status      String        @default("pending")
+  priority    String        @default("medium")
+  dueDate     DateTime?
+  position    Int           @default(0)
+  color       String?
+  images      Json?         @default("[]")
+  userId      Int?
+  user        User?         @relation(fields: [userId], references: [id])
+  columnId    Int?
+  column      Column?       @relation(fields: [columnId], references: [id])
+  projectId   Int?
+  project     Project?      @relation(fields: [projectId], references: [id])
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  comments    TaskComment[]
+
+  @@map("tasks")
+}
+
+// Modelo de Comentarios en Tareas
+model TaskComment {
+  id        Int      @id @default(autoincrement())
+  content   String
+  taskId    Int
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("task_comments")
+}
+
+// Modelo de Columnas (para Kanban)
+model Column {
+  id        Int      @id @default(autoincrement())
+  name      String
+  position  Int      @default(0)
+  color     String?
+  projectId Int?
+  project   Project? @relation(fields: [projectId], references: [id])
+  tasks     Task[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("columns")
+}
+
+// Modelo de Proyectos
+model Project {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  color       String?
+  columns     Column[]
+  tasks       Task[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("projects")
+}
+
+// Modelo de Clientes
+model Client {
+  id        Int       @id @default(autoincrement())
+  name      String
+  email     String?
+  phone     String?
+  address   String?
+  invoices  Invoice[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("clients")
+}
+
+// Modelo de Servicios
+model Service {
+  id          Int            @id @default(autoincrement())
+  name        String
+  description String?
+  price       Decimal        @db.Decimal(10, 2)
+  invoices    InvoiceItem[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@map("services")
+}
+
+// Modelo de Facturas
+model Invoice {
+  id        Int           @id @default(autoincrement())
+  number    String        @unique
+  clientId  Int
+  client    Client        @relation(fields: [clientId], references: [id])
+  items     InvoiceItem[]
+  total     Decimal       @db.Decimal(10, 2)
+  status    String        @default("pending")
+  dueDate   DateTime?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@map("invoices")
+}
+
+// Modelo de Items de Factura
+model InvoiceItem {
+  id        Int      @id @default(autoincrement())
+  invoiceId Int
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  serviceId Int
+  service   Service  @relation(fields: [serviceId], references: [id])
+  quantity  Int      @default(1)
+  price     Decimal  @db.Decimal(10, 2)
+  createdAt DateTime @default(now())
+
+  @@map("invoice_items")
+}
